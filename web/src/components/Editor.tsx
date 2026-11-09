@@ -15,6 +15,7 @@ import { StepForm } from "./StepForm";
 import { Button, ErrorNote, inputClass, shortModel } from "./ui";
 import { get, post, type CheckResponse, type PanelEntry } from "@/lib/api";
 import { loadDraft } from "@/lib/draft";
+import { useMe } from "@/lib/session";
 
 function range(e?: { low: number; high: number }): string | undefined {
   return e ? `${formatUsd(e.low)}–${formatUsd(e.high)}` : undefined;
@@ -72,8 +73,10 @@ function cardsFor(view: ViewNode, panel: Panel, estimate: TreeEstimate | undefin
 }
 
 export function Editor() {
+  const me = useMe();
   const params = useSearchParams();
   const router = useRouter();
+  const [savedId, setSavedId] = useState<string | undefined>(params.get("saved") ?? undefined);
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [panelName, setPanelName] = useState(params.get("panel") ?? "starter");
   const [tree, setTree] = useState<Tree>();
@@ -87,8 +90,19 @@ export function Editor() {
   const [saved, setSaved] = useState<string>();
   const capTouched = useRef(false);
 
-  // Load the tree: a fresh draft, or a file.
+  // Start from the account's defaults.
   useEffect(() => {
+    if (!me) return;
+    if (!params.get("panel") && !params.get("draft") && me.user.settings.defaultPanel) setPanelName(me.user.settings.defaultPanel);
+    if (me.user.settings.defaultCapUsd && !capTouched.current) {
+      capTouched.current = true;
+      setCap(me.user.settings.defaultCapUsd.toFixed(2));
+    }
+  }, [me, params]);
+
+  // Load the tree: a fresh draft, one of the account's saved trees, or an example.
+  useEffect(() => {
+    if (!me) return;
     get<PanelEntry[]>("/api/panels")
       .then(setPanels)
       .catch((e: Error) => setLoadError(e.message));
@@ -103,6 +117,10 @@ export function Editor() {
       } catch (e) {
         setLoadError((e as Error).message);
       }
+    } else if (params.get("saved")) {
+      get<{ id: string; tree: unknown }>(`/api/trees/${encodeURIComponent(params.get("saved")!)}`)
+        .then((r) => setTree(parseTree(r.tree)))
+        .catch((e: Error) => setLoadError(e.message));
     } else if (path) {
       get<{ tree: unknown }>(`/api/tree?path=${encodeURIComponent(path)}`)
         .then((r) => setTree(parseTree(r.tree)))
@@ -110,7 +128,7 @@ export function Editor() {
     } else {
       setLoadError("Nothing to edit yet. Draft a plan or open a tree from the start page.");
     }
-  }, [params]);
+  }, [params, me?.user.id]);
 
   const panel = panels.find((p) => p.name === panelName)?.panel;
 
@@ -148,8 +166,10 @@ export function Editor() {
     if (!tree) return;
     setBusy("save");
     try {
-      const r = await post<{ path: string }>("/api/trees", { tree: treeToJson(tree) });
-      setSaved(r.path);
+      const r = await post<{ id: string }>("/api/trees", savedId ? { tree: treeToJson(tree), id: savedId } : { tree: treeToJson(tree) });
+      setSavedId(r.id);
+      setSaved("Saved to your trees.");
+      if (!params.get("saved")) router.replace(`/edit?saved=${r.id}&panel=${panelName}`);
     } catch (e) {
       setEditError((e as Error).message);
     } finally {
@@ -178,7 +198,7 @@ export function Editor() {
       </div>
     );
   }
-  if (!tree || !view || !panel) return <div className="p-10 text-[13px] text-graphite">Loading…</div>;
+  if (!me || !tree || !view || !panel) return <div className="p-10 text-[13px] text-graphite">Loading…</div>;
 
   const capNum = Number(cap);
   const over = estimate && Number.isFinite(capNum) && estimate.total.high > capNum * 1e9;
@@ -234,7 +254,7 @@ export function Editor() {
               />
             </label>
             <Button onClick={() => void save()} disabled={busy !== undefined}>
-              {busy === "save" ? "Saving…" : "Save tree"}
+              {busy === "save" ? "Saving…" : savedId ? "Save changes" : "Save tree"}
             </Button>
             <Button tone="primary" onClick={() => void run()} disabled={!check?.ok || !(capNum > 0) || busy !== undefined}>
               {busy === "run" ? "Starting…" : "Run it"}
@@ -246,7 +266,7 @@ export function Editor() {
             {check && !check.ok && <ErrorNote>{check.error}</ErrorNote>}
             {editError && <ErrorNote>{editError}</ErrorNote>}
             {over && <span className="note text-red">The high estimate is above what you'll spend, so the run may pause before it finishes.</span>}
-            {saved && <span className="note text-ink">Saved to {saved}.</span>}
+            {saved && <span className="note text-ink">{saved}</span>}
             {drafted && (
               <span className="note text-graphite">
                 Drafted by {shortModel(drafted.model)} in {drafted.attempts} attempt{drafted.attempts > 1 ? "s" : ""} for {formatUsd(drafted.costNanos)}, which counts towards what you spend.

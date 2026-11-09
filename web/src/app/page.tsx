@@ -4,29 +4,47 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatUsd } from "orch/src/core/money.ts";
 import { useEffect, useState } from "react";
+import { Landing } from "@/components/Landing";
 import { Button, ErrorNote, Status } from "@/components/ui";
 import { get, post, type Config, type Examples, type PanelEntry, type PlanResponse, type RunListItem } from "@/lib/api";
 import { saveDraft } from "@/lib/draft";
+import { useSession, type Me } from "@/lib/session";
 
 export default function Home() {
+  const { session } = useSession();
+  if (session.status === "loading") return null;
+  if (session.status === "signed-out") return <Landing />;
+  return <Workspace me={session.me} />;
+}
+
+interface SavedTree {
+  id: string;
+  goal: string;
+  updatedAt: string;
+}
+
+function Workspace({ me }: { me: Me }) {
   const router = useRouter();
   const [config, setConfig] = useState<Config>();
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [examples, setExamples] = useState<Examples>();
   const [runs, setRuns] = useState<RunListItem[]>([]);
+  const [saved, setSaved] = useState<SavedTree[]>([]);
   const [goal, setGoal] = useState("");
-  const [panel, setPanel] = useState("starter");
+  const [panel, setPanel] = useState(me.user.settings.defaultPanel ?? "starter");
+  const needsKey = me.gateway === "openrouter" && !me.keys.some((k) => k.provider === "openrouter");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    Promise.all([get<Config>("/api/config"), get<PanelEntry[]>("/api/panels"), get<Examples>("/api/examples"), get<RunListItem[]>("/api/runs")])
-      .then(([c, p, e, r]) => {
+    Promise.all([get<Config>("/api/config"), get<PanelEntry[]>("/api/panels"), get<Examples>("/api/examples"), get<RunListItem[]>("/api/runs"), get<SavedTree[]>("/api/trees")])
+      .then(([c, p, e, r, t]) => {
         setConfig(c);
         setPanels(p);
         setExamples(e);
         setRuns(r);
-        if (!p.some((x) => x.name === "starter") && p[0]) setPanel(p[0].name);
+        setSaved(t);
+        setPanel((current) => (p.some((x) => x.name === current) ? current : (p[0]?.name ?? current)));
       })
       .catch((err: Error) => setError(err.message));
   }, []);
@@ -66,7 +84,7 @@ export default function Home() {
           aria-label="Your goal"
         />
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Button tone="primary" disabled={!goal.trim() || busy || !planner} onClick={() => void draft()}>
+          <Button tone="primary" disabled={!goal.trim() || busy || !planner || needsKey} onClick={() => void draft()}>
             {busy ? "Drafting the plan…" : "Draft the plan"}
           </Button>
           <label className="flex items-center gap-2 text-[14px] text-ink-soft">
@@ -90,6 +108,11 @@ export default function Home() {
             </span>
           )}
           {panels.length > 0 && !planner && <span className="note text-[13px] text-red">This panel has no plan role, so it can't draft.</span>}
+          {needsKey && (
+            <Link href="/settings#keys" className="note text-[13px] text-red underline">
+              Connect your OpenRouter key first
+            </Link>
+          )}
         </div>
         {error && (
           <div className="mt-5">
@@ -117,7 +140,21 @@ export default function Home() {
 
         <div className="mt-14 grid gap-12 md:grid-cols-2">
           <section>
-            <h2 className="text-[14px] font-semibold">Open a saved tree</h2>
+            <h2 className="text-[14px] font-semibold">Your saved trees</h2>
+            {saved.length === 0 ? (
+              <p className="note mt-3 text-[14px] text-graphite">Trees you save from the editor show up here.</p>
+            ) : (
+              <ul className="mt-3 flex flex-col">
+                {saved.slice(0, 6).map((t) => (
+                  <li key={t.id}>
+                    <Link href={`/edit?saved=${t.id}&panel=${panel}`} className="group block border-b border-rule py-2">
+                      <span className="line-clamp-1 text-[14px] text-ink group-hover:underline">{t.goal}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h2 className="mt-10 text-[14px] font-semibold">Example trees</h2>
             <ul className="mt-3 flex flex-col">
               {examples?.trees.map((t) => (
                 <li key={t.path}>

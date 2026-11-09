@@ -45,16 +45,32 @@ export interface PlanResponse {
 
 export type CheckResponse = { ok: true; estimate: TreeEstimate } | { ok: false; error: string };
 
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function handle<T>(res: Response): Promise<T> {
   const text = await res.text();
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Error(res.ok ? "the engine sent something that isn't JSON" : `the engine isn't answering (HTTP ${res.status}). Is \`pnpm serve\` running?`);
+    throw new ApiError(res.status, res.ok ? "The engine sent something that isn't JSON." : `The engine isn't answering (HTTP ${res.status}). Is it running?`);
   }
-  if (!res.ok) throw new Error((json as { error?: string }).error ?? `HTTP ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, sentence((json as { error?: string }).error ?? `HTTP ${res.status}`));
   return json as T;
+}
+
+// The engine writes errors in lower case to fit into sentences; the web
+// app shows them on their own.
+function sentence(s: string): string {
+  const t = s.charAt(0).toUpperCase() + s.slice(1);
+  return /[.!?]$/.test(t) ? t : `${t}.`;
 }
 
 export async function get<T>(path: string): Promise<T> {

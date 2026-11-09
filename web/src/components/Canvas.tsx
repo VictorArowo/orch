@@ -9,15 +9,13 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
-  useNodesInitialized,
-  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
 import { layout } from "orch/src/view/layout.ts";
 import { edgesOf, type ViewNode } from "orch/src/view/view.ts";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 export type Tone = "role" | "dim" | "faint" | "run" | "done" | "fail" | "blocked" | "stale" | "ink";
 export type CardStatus = "idle" | "pending" | "running" | "blocked" | "done" | "failed";
@@ -175,10 +173,11 @@ export interface CanvasProps {
   onSelect: (id: string | undefined) => void;
   // Steps that are working right now; edges into them are animated.
   active?: Set<string>;
+  // A picture rather than a tool: no panning, zooming or controls.
+  still?: boolean;
 }
 
-function Inner({ root, info, selected, onSelect, active }: CanvasProps) {
-  const { fitView } = useReactFlow();
+function Inner({ root, info, selected, onSelect, active, still }: CanvasProps) {
   const placed = useMemo(() => layout(root), [root]);
   const shape = placed.nodes.map((n) => n.id).join("|");
 
@@ -231,17 +230,13 @@ function Inner({ root, info, selected, onSelect, active }: CanvasProps) {
     [root, active],
   );
 
-  // Fit the whole tree whenever its shape changes, once React Flow has
-  // measured the new nodes.
-  const initialized = useNodesInitialized();
-  useEffect(() => {
-    if (!initialized) return;
-    const t = setTimeout(() => void fitView({ padding: 0.12, duration: 250 }), 150);
-    return () => clearTimeout(t);
-  }, [shape, initialized, fitView]);
+
 
   return (
+    // A new shape (a fan-out expanding, a step added) remounts the canvas, so
+    // React Flow fits the whole tree once it has measured the new nodes.
     <ReactFlow
+      key={shape}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -252,12 +247,18 @@ function Inner({ root, info, selected, onSelect, active }: CanvasProps) {
       elementsSelectable={false}
       minZoom={0.15}
       maxZoom={1.6}
+      panOnDrag={!still}
+      zoomOnScroll={!still}
+      zoomOnPinch={!still}
+      zoomOnDoubleClick={!still}
+      preventScrolling={!still}
       fitView
+      fitViewOptions={{ padding: 0.12 }}
       proOptions={{ hideAttribution: true }}
       colorMode="light"
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#d3d6d0" />
-      <Controls showInteractive={false} position="bottom-left" />
+      {!still && <Controls showInteractive={false} position="bottom-left" />}
     </ReactFlow>
   );
 }
