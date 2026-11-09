@@ -92,7 +92,7 @@ Run the same tree with two panels side by side and compare the outputs, time and
 
 ## How a run works
 
-1. Draft. The plan role turns the goal into a tree, assigns a role to each step and estimates the cost.
+1. Draft. The plan role turns the goal into a tree, assigns a role to each step and estimates the cost. Small slips in its reply are repaired and listed; a plan that still fails validation goes back to the model with the problems, up to three attempts. Drafting has its own small cap, and when a run is drafted and started in one go, drafting counts against the run's cap too.
 2. Shape. You edit the tree: add, remove or reorder steps, switch fan-out on or off, change roles and models, and set the budget cap. Nothing runs until you press run.
 3. Run. The scheduler runs ready steps in parallel up to a concurrency limit. Each step gets only its own instructions and inputs, not the whole run's history, and returns structured output.
 4. Review, if you added it. A check role reviews a step and can send it back with notes, twice by default. If the check still wants changes after that, the last output is accepted with a warning rather than failing the step. A critique role objects once, the step's role revises, and the revision goes through the check again.
@@ -101,7 +101,7 @@ Run the same tree with two panels side by side and compare the outputs, time and
 
 ## Cost
 
-- Estimate before you run, per step and for the whole tree, based on the models' prices and rough token counts per kind of step.
+- Estimate before you run, per step and for the whole tree, based on the models' prices and rough token counts per kind of step. It's a range: the low end assumes everything works first time at typical reply sizes, the high end that every check and critique sends work back and every reply uses its full limit. A fan-out whose list isn't known yet assumes the count its wording gives, or a range up to the fan-out limit.
 - Live spend per step and for the run, in money rather than tokens.
 - A hard cap. Before each model call, the engine reserves that call's worst-case cost against the cap and releases what isn't used afterwards. The worst case is the completion limit times the output price, plus the prompt's UTF-8 byte count times the input price, since a prompt can't have more tokens than bytes. That overstates the prompt about fourfold, but only until the call settles. A call that doesn't fit next to the calls in flight waits for them. When nothing more fits under the cap, the run pauses and asks.
 - A call cut off by a crash or a hard stop may or may not have been billed, so it counts at its full reservation.
