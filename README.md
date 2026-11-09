@@ -22,6 +22,8 @@ Open http://localhost:3000 and create an account. Before anything can run, add y
 
 Then draft a plan from one of the example goals. The editor shows the tree on a canvas with a cost estimate per step. Click a step to change its instructions, role, model or reviewers. Run it, and the tree fills in live: steps not started are pencilled in, the steps working now are highlighted, finished ones are inked. Click any step to see what it was told, what it did, who reviewed it and what each call cost.
 
+You can steer a run while it goes. Click a step and the side panel offers what fits its state: pause it (any call it has under way stops; a stopped call may still be billed, so it counts at its worst case), resume it, skip it so the steps after it go ahead, or edit its instructions, role, model and reviewers, which apply from its next attempt. Pause a whole box to hold a branch. A finished step can be re-run, on another model if you like, together with the steps that used its output; when steps are left reading outdated output, the run page offers to re-run them. A step that failed can be skipped, and the run carries on.
+
 Settings also covers your profile, password, default panel and spending limits, and deleting the account (which deletes its runs, saved trees and stored key).
 
 `pnpm dev` runs `orch serve` on port 4317 and the Next.js app on port 3000, which forwards `/api` to the engine. To run them separately, use `pnpm serve` and `pnpm --filter web dev`.
@@ -86,7 +88,8 @@ orch plan "<goal>" --panel <panel.json> [--out <file>] [--plan-cap <usd>] [--moc
 orch run <tree.json> --panel <panel.json> --cap <usd> [--mock] [--concurrency n]
 orch run --goal "<goal>" --panel <panel.json> --cap <usd> [--yes] [--mock]
 orch resume <run-id> [--cap <usd>]
-orch rerun <run-id> <step-id>... [--model <id>]
+orch rerun <run-id> <step-id>... [--model <id>] [--cascade]
+orch skip <run-id> <step-id>...
 orch show <run-id> [<step-id>]
 orch runs
 orch serve [--port <n>]

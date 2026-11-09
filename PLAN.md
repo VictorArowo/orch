@@ -96,7 +96,7 @@ Run the same tree with two panels side by side and compare the outputs, time and
 2. Shape. You edit the tree: add, remove or reorder steps, switch fan-out on or off, change roles and models, and set the budget cap. Nothing runs until you press run.
 3. Run. The scheduler runs ready steps in parallel up to a concurrency limit. Each step gets only its own instructions and inputs, not the whole run's history, and returns structured output.
 4. Review, if you added it. A check role reviews a step and can send it back with notes, twice by default. If the check still wants changes after that, the last output is accepted with a warning rather than failing the step. A critique role objects once, the step's role revises, and the revision goes through the check again.
-5. Steer. At any point you can pause the run or a branch, edit a step, swap its model, skip it, or re-run it. Re-running a step marks everything that used its old output as stale and offers to re-run those too. Open gap: re-running the step a fan-out reads its list from doesn't rebuild the fan-out, so the branches stay as they were.
+5. Steer. At any point you can pause the run or a branch, edit a step, swap its model, skip it, or re-run it. Re-running a step marks everything that used its old output as stale and offers to re-run those too. Pausing a single step stops any call it has under way; that call may still be billed, so it counts at its full reservation. An edit applies from the step's next attempt, and a fan-out's template can be edited until it makes its branches. A skipped step counts as done with no output, so a run stopped by a failure can carry on. Open gap: re-running the step a fan-out reads its list from doesn't rebuild the fan-out, so the branches stay as they were.
 6. Finish. The root step produces the result. It's shown next to the tree with a cost breakdown per step.
 
 ## Cost
@@ -175,10 +175,10 @@ Later, if it's still fun:
 
 ## Milestones
 
-1. Engine and CLI. Event log, step tree, scheduler, budget reservations, and panels read from a config file. A CLI runs one goal end to end and prints the tree with the role, model, output and cost for every step.
-2. Planner. Goal to tree with roles and estimates. Try it on ten varied goals and tune it until the trees look sensible.
-3. Tree editor and live run view. Shape a plan in the browser, run it, and watch it live.
-4. Steering. Pause, edit, swap models and re-run, including stale-output tracking.
+1. Engine and CLI. Event log, step tree, scheduler, budget reservations, and panels read from a config file. A CLI runs one goal end to end and prints the tree with the role, model, output and cost for every step. (Done.)
+2. Planner. Goal to tree with roles and estimates. Try it on ten varied goals and tune it until the trees look sensible. (Done.)
+3. Tree editor and live run view. Shape a plan in the browser, run it, and watch it live. (Done.)
+4. Steering. Pause, edit, swap models and re-run, including stale-output tracking. (Done.)
 5. Inspector, replay and public demo. Record three or four good runs and make them replayable on the site. (Accounts, connecting OpenRouter and encrypted key storage were brought forward and are done.)
 6. Write-up. A post in the style of the others, for example "the same goal with three panels": what the trees looked like, where models disagreed, and what each run cost.
 
