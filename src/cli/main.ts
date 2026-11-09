@@ -32,6 +32,7 @@ import type { Gateway } from "../gateway/gateway.ts";
 import { hash, MockGateway } from "../gateway/mock.ts";
 import { OpenRouterGateway } from "../gateway/openrouter.ts";
 import { redact } from "../gateway/redact.ts";
+import { serve } from "../server/server.ts";
 import { describeTarget, openStore } from "../store/open.ts";
 import type { Store } from "../store/store.ts";
 import { modelsUsed, renderPlan, renderSummary, renderTree } from "./render.ts";
@@ -78,6 +79,7 @@ type Flags = {
   "plan-cap"?: string;
   yes?: boolean;
   "no-live"?: boolean;
+  port?: string;
   help?: boolean;
 };
 
@@ -554,6 +556,19 @@ async function cmdRuns(flags: Flags) {
   }
 }
 
+async function cmdServe(flags: Flags) {
+  const gateway = gatewayFor(flags.mock ? "mock" : "openrouter");
+  const store = await connect(flags);
+  const planCapUsd = flags["plan-cap"] !== undefined ? money(flags["plan-cap"], "--plan-cap") / 1e9 : DEFAULT_PLAN_CAP_USD;
+  const secrets = process.env.OPENROUTER_API_KEY ? [process.env.OPENROUTER_API_KEY] : [];
+  const server = await serve({ store, gateway, root: process.cwd(), port: int(flags.port) ?? 4317, planCapUsd, secrets });
+  console.log(`orch engine on ${server.url} using ${gateway.name === "mock" ? "mock models" : "OpenRouter"}. Ctrl-C to stop.`);
+  await new Promise<void>((resolve) => process.once("SIGINT", () => resolve()));
+  console.log("Stopping: pausing runs in progress…");
+  await server.close();
+  await store.close();
+}
+
 async function main() {
   loadEnv();
   const { values, positionals } = parseArgs({
@@ -573,6 +588,7 @@ async function main() {
       "plan-cap": { type: "string" },
       yes: { type: "boolean", short: "y" },
       "no-live": { type: "boolean" },
+      port: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -595,6 +611,8 @@ async function main() {
       return cmdShow(args, flags);
     case "runs":
       return cmdRuns(flags);
+    case "serve":
+      return cmdServe(flags);
     default:
       throw new UsageError(`unknown command "${cmd}"`);
   }
