@@ -2,8 +2,6 @@
 
 You give orch a goal. It drafts a plan as a tree of steps, some in sequence and some in parallel. You decide which roles and models handle which steps, and what each run may spend, then watch it run: parallel branches fan out, outputs flow to the steps that read them, checkers send work back, and spend ticks up against a hard cap.
 
-It covers milestones 1 to 3 of [PLAN.md](PLAN.md), plus accounts and stored keys from milestone 5: the engine, a CLI, the planner, and a web app where each account drafts, edits and runs its own trees on its own OpenRouter key.
-
 ## The web app
 
 You need Node 22 and pnpm.
