@@ -2,7 +2,6 @@ import { mkdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 import { SqlStore, type SqlClient, type SqlDb } from "./sql-store.ts";
-import type { Store } from "./store.ts";
 
 function pgliteDb(db: PGlite): SqlDb {
   return {
@@ -57,7 +56,7 @@ function pgDb(pool: pg.Pool): SqlDb {
 
 // `postgres://...` connects to a server. Anything else is a directory for an
 // embedded PGlite database, and "memory:" keeps it in memory (for tests).
-export async function openStore(target: string): Promise<Store> {
+export async function openStore(target: string): Promise<SqlStore> {
   let db: SqlDb;
   if (/^postgres(ql)?:\/\//.test(target)) {
     const pool = new pg.Pool({ connectionString: target, max: 10 });

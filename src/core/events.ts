@@ -43,6 +43,8 @@ export type EventBody =
       limits: Limits;
       concurrency: number;
       gateway: string;
+      // The account that started the run, when it came from the web app.
+      owner?: string;
     }
   | ({ type: "run.drafted" } & Drafted)
   | { type: "run.started" }

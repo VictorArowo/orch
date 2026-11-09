@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_active_per_step
   ON jobs (run_id, step_id) WHERE status IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS jobs_claimable ON jobs (run_id, status, run_after);
+
+-- Runs started from the web belong to an account; CLI runs belong to no one.
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS user_id text;
+CREATE INDEX IF NOT EXISTS runs_by_user ON runs (user_id, created_at);
 `;
 
 interface EventRow {
@@ -62,6 +66,11 @@ function toEvent(r: EventRow): RunEvent {
 export class SqlStore implements Store {
   constructor(private readonly db: SqlDb) {}
 
+  // The same connection, for other tables that live alongside runs.
+  get sql(): SqlDb {
+    return this.db;
+  }
+
   async init(): Promise<void> {
     await this.db.exec(SCHEMA);
   }
@@ -73,13 +82,18 @@ export class SqlStore implements Store {
   async createRun(runId: string, first: EventBody): Promise<RunEvent> {
     if (first.type !== "run.created") throw new Error("a run must start with run.created");
     return this.db.tx(async (c) => {
-      await c.query(`INSERT INTO runs (id, goal, last_seq) VALUES ($1, $2, 1)`, [runId, first.goal]);
+      await c.query(`INSERT INTO runs (id, goal, last_seq, user_id) VALUES ($1, $2, 1, $3)`, [runId, first.goal, first.owner ?? null]);
       const rows = await c.query<EventRow>(
         `INSERT INTO events (run_id, seq, type, body) VALUES ($1, 1, $2, $3::jsonb) RETURNING run_id, seq, body, at`,
         [runId, first.type, JSON.stringify(first)],
       );
       return toEvent(rows[0]!);
     });
+  }
+
+  async ownerOf(runId: string): Promise<string | null | undefined> {
+    const rows = await this.db.query<{ user_id: string | null }>(`SELECT user_id FROM runs WHERE id = $1`, [runId]);
+    return rows[0] ? rows[0].user_id : undefined;
   }
 
   async readEvents(runId: string, afterSeq = 0): Promise<RunEvent[]> {
@@ -90,9 +104,12 @@ export class SqlStore implements Store {
     return rows.map(toEvent);
   }
 
-  async listRuns(): Promise<RunSummary[]> {
+  async listRuns(opts: { owner?: string } = {}): Promise<RunSummary[]> {
     const rows = await this.db.query<{ id: string; goal: string; created_at: Date | string; last_seq: number }>(
-      `SELECT id, goal, created_at, last_seq FROM runs ORDER BY created_at DESC LIMIT 50`,
+      opts.owner === undefined
+        ? `SELECT id, goal, created_at, last_seq FROM runs ORDER BY created_at DESC LIMIT 50`
+        : `SELECT id, goal, created_at, last_seq FROM runs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      opts.owner === undefined ? [] : [opts.owner],
     );
     return rows.map((r) => ({
       runId: r.id,

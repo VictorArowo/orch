@@ -15,18 +15,21 @@ interface ChatResponse {
   error?: { message?: string; code?: number };
 }
 
+// The public price list is the same for everyone, so it is shared.
+let sharedPrices: Promise<Map<string, Price>> | undefined;
+
 // OpenRouter: one key reaches every model, and each response reports what the
-// call really cost, which is what the budget reconciles to.
+// call really cost, which is what the budget reconciles to. The key can be a
+// function, so a stored key is decrypted only when a call is about to be made.
 export class OpenRouterGateway implements Gateway {
   readonly name = "openrouter";
-  private prices: Promise<Map<string, Price>> | undefined;
 
-  constructor(private readonly apiKey: string) {
+  constructor(private readonly apiKey: string | (() => Promise<string>)) {
     if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set");
   }
 
   private loadPrices(): Promise<Map<string, Price>> {
-    this.prices ??= (async () => {
+    sharedPrices ??= (async () => {
       const res = await fetch(`${BASE}/models`);
       if (!res.ok) throw new GatewayError(`couldn't load OpenRouter prices (HTTP ${res.status})`, true);
       const body = (await res.json()) as ModelsResponse;
@@ -40,8 +43,8 @@ export class OpenRouterGateway implements Gateway {
       }
       return map;
     })();
-    this.prices.catch(() => (this.prices = undefined));
-    return this.prices;
+    sharedPrices.catch(() => (sharedPrices = undefined));
+    return sharedPrices;
   }
 
   async price(model: string): Promise<Price> {
@@ -51,6 +54,8 @@ export class OpenRouterGateway implements Gateway {
   }
 
   async complete(req: CompletionRequest, signal?: AbortSignal): Promise<CompletionResult> {
+    const key = typeof this.apiKey === "string" ? this.apiKey : await this.apiKey();
+    const clean = (s: string) => redact(s, [key]);
     const body: Record<string, unknown> = {
       model: req.model,
       messages: req.messages,
@@ -66,7 +71,7 @@ export class OpenRouterGateway implements Gateway {
       res = await fetch(`${BASE}/chat/completions`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
           "X-Title": "orch",
         },
@@ -74,19 +79,19 @@ export class OpenRouterGateway implements Gateway {
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
     } catch (err) {
-      throw new GatewayError(this.clean(`request to OpenRouter failed: ${(err as Error).message}`), true);
+      throw new GatewayError(clean(`request to OpenRouter failed: ${(err as Error).message}`), true);
     }
     const text = await res.text();
     let json: ChatResponse;
     try {
       json = JSON.parse(text) as ChatResponse;
     } catch {
-      throw new GatewayError(this.clean(`OpenRouter returned HTTP ${res.status} with a non-JSON body`), res.status >= 500);
+      throw new GatewayError(clean(`OpenRouter returned HTTP ${res.status} with a non-JSON body`), res.status >= 500);
     }
     if (!res.ok || json.error) {
       const msg = json.error?.message ?? `HTTP ${res.status}`;
       const retryable = res.status === 429 || res.status >= 500 || res.status === 408;
-      throw new GatewayError(this.clean(`OpenRouter error (${res.status}): ${msg}`), retryable);
+      throw new GatewayError(clean(`OpenRouter error (${res.status}): ${msg}`), retryable);
     }
     const content = json.choices?.[0]?.message?.content ?? "";
     const result: CompletionResult = {
@@ -98,9 +103,5 @@ export class OpenRouterGateway implements Gateway {
     };
     if (typeof json.usage?.cost === "number") result.costNanos = usdToNanos(json.usage.cost);
     return result;
-  }
-
-  private clean(s: string): string {
-    return redact(s, [this.apiKey]);
   }
 }

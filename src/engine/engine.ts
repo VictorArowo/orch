@@ -28,7 +28,9 @@ import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type St
 
 export interface EngineOptions {
   store: Store;
-  gateway: Gateway;
+  // One gateway for every run, or one per account (so each user's runs use
+  // their own key).
+  gateway: Gateway | ((owner: string | undefined) => Gateway);
   workerId?: string;
   leaseMs?: number;
   pollMs?: number;
@@ -46,6 +48,8 @@ export interface CreateRunOptions {
   concurrency?: number;
   // Set when the tree came from the planner in the same command.
   drafted?: Drafted;
+  // The account starting the run, when it comes from the web app.
+  owner?: string;
 }
 
 class Killed extends Error {}
@@ -88,7 +92,7 @@ export function localWorkerIsDead(workerId: string): boolean {
 export class Engine extends EventEmitter<{ event: [RunEvent] }> {
   readonly workerId: string;
   private readonly store: Store;
-  private readonly gateway: Gateway;
+  private readonly gatewayFor: (owner: string | undefined) => Gateway;
   private readonly leaseMs: number;
   private readonly pollMs: number;
   private readonly retryBackoffMs: number;
@@ -100,7 +104,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
   constructor(opts: EngineOptions) {
     super();
     this.store = opts.store;
-    this.gateway = opts.gateway;
+    const g = opts.gateway;
+    this.gatewayFor = typeof g === "function" ? g : () => g;
     this.workerId = opts.workerId ?? newWorkerId();
     this.leaseMs = opts.leaseMs ?? 30_000;
     this.pollMs = opts.pollMs ?? 100;
@@ -115,7 +120,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     const { models } = checkTree(opts.tree, opts.panel, limits);
     // Every model must have a known price before anything runs, or the cap
     // can't be enforced. This also catches typos in model ids.
-    for (const m of models) await this.gateway.price(m);
+    const gateway = this.gatewayFor(opts.owner);
+    for (const m of models) await gateway.price(m);
     if (opts.drafted && opts.drafted.costNanos > opts.capNanos) throw new Error("planning already spent more than the cap");
     const created: EventBody = {
       type: "run.created",
@@ -125,8 +131,9 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
       cap: opts.capNanos,
       limits,
       concurrency: Math.max(1, opts.concurrency ?? 4),
-      gateway: this.gateway.name,
+      gateway: gateway.name,
     };
+    if (opts.owner) created.owner = opts.owner;
     const runId = newRunId();
     this.guard();
     const first = await this.store.createRun(runId, created);
@@ -170,7 +177,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
   // Run a leaf again, optionally on another model. Steps that read its old
   // output become stale; they are left alone unless re-run too.
   async rerun(runId: string, stepIds: string[], opts: { model?: string } = {}): Promise<void> {
-    if (opts.model) await this.gateway.price(opts.model);
+    if (opts.model) await this.gatewayFor((await this.refresh(runId)).owner).price(opts.model);
     await this.locked(runId, (s) => {
       const events: EventBody[] = [];
       for (const id of stepIds) {
@@ -555,7 +562,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     | { kind: "wait" | "blocked" }
     | { kind: "done"; results: ({ ok: true; text: string } | { ok: false; error: string; retryable: boolean })[] }
   > {
-    const prices = await Promise.all(calls.map((c) => this.gateway.price(c.model)));
+    const gateway = this.gatewayFor(this.cache.get(job.runId)!.owner);
+    const prices = await Promise.all(calls.map((c) => gateway.price(c.model)));
     const amounts = calls.map((c, i) => worstCase(prices[i]!, c.messages, c.maxTokens));
     const total = amounts.reduce((a, b) => a + b, 0);
     const base = attempt.callIds.length;
@@ -596,7 +604,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
       calls.map(async (c, i) => {
         const started = Date.now();
         try {
-          const res = await this.gateway.complete({
+          const res = await gateway.complete({
             model: c.model,
             messages: c.messages,
             maxTokens: c.maxTokens,

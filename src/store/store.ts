@@ -36,7 +36,10 @@ export interface Store {
 
   createRun(runId: string, first: EventBody): Promise<RunEvent>;
   readEvents(runId: string, afterSeq?: number): Promise<RunEvent[]>;
-  listRuns(): Promise<RunSummary[]>;
+  listRuns(opts?: { owner?: string }): Promise<RunSummary[]>;
+  // The account a run belongs to: null for one started from the CLI,
+  // undefined when there is no such run.
+  ownerOf(runId: string): Promise<string | null | undefined>;
 
   // Run `fn` while holding the run's lock, then append its events and apply
   // its queue changes in the same transaction. If `fence` is given, the write

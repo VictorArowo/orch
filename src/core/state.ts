@@ -82,6 +82,7 @@ export interface RunState {
   concurrency: number;
   panel: Panel;
   gateway: string;
+  owner?: string;
   rootId: string;
   steps: Record<string, StepState>;
   order: string[];
@@ -166,6 +167,7 @@ export function apply(state: RunState, e: RunEvent): RunState {
       state.limits = e.limits;
       state.concurrency = e.concurrency;
       state.gateway = e.gateway;
+      if (e.owner) state.owner = e.owner;
       state.rootId = e.root.id;
       state.createdAt = e.at;
       addStep(state, e.root, undefined, 1);
