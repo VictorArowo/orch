@@ -139,3 +139,53 @@ describe("check, critique and ladders", () => {
     await h2.close();
   });
 });
+
+describe("replies that run out of room", () => {
+  it("retries a cut-off reply with double the room, before any review sees it, without climbing the ladder", async () => {
+    const seen: { model: string; maxTokens: number; purpose: string }[] = [];
+    const h = await harness({
+      respond(req) {
+        seen.push({ model: req.model, maxTokens: req.maxTokens, purpose: req.meta.purpose });
+        if (req.meta.purpose === "critique") return JSON.stringify({ objections: [] });
+        const doCalls = seen.filter((s) => s.purpose === "do").length;
+        return doCalls < 3 ? { text: "Event sourcing means storing the list of things that", truncated: true } : "The whole post.";
+      },
+    });
+    const state = await h.run(tree({ id: "s", role: "worker", critique: "critic" }));
+    expect(state.status).toBe("done");
+    expect(seen.map((s) => [s.purpose, s.model, s.maxTokens])).toEqual([
+      ["do", "m/cheap", 100],
+      ["do", "m/cheap", 200],
+      ["do", "m/cheap", 400],
+      ["critique", "m/critic", 50],
+    ]);
+    const attempts = state.steps.s!.attemptIds.map((a) => state.attempts[a]!);
+    expect(attempts.map((a) => a.rejected?.reason ?? a.status)).toEqual(["length", "length", "accepted"]);
+    // The retry doesn't see the half-finished draft, only that it ran out.
+    const retry = state.calls[attempts[1]!.callIds[0]!]!.messages[1]!.content;
+    expect(retry).toContain("ran out of room");
+    expect(retry).not.toContain("<previous>");
+    expect(state.attempts[state.steps.s!.acceptedAttemptId!]!.output).toBe("The whole post.");
+    await h.close();
+  });
+
+  it("keeps a reply that is still cut off after the retries, with a warning", async () => {
+    const h = await harness({ respond: () => ({ text: "Half a post", truncated: true }) });
+    const state = await h.run(tree({ id: "s", role: "worker" }));
+    expect(state.status).toBe("done");
+    expect(state.steps.s!.attemptIds).toHaveLength(3);
+    expect(state.steps.s!.warning).toMatch(/cut off/);
+    await h.close();
+  });
+
+  it("sends an empty reply back instead of passing it on", async () => {
+    let n = 0;
+    const h = await harness({ respond: (req) => (req.meta.purpose === "do" ? (n++ === 0 ? "   " : "Something real") : undefined) });
+    const state = await h.run(tree({ id: "s", role: "worker", check: "checker" }));
+    const [first, second] = state.steps.s!.attemptIds.map((a) => state.attempts[a]!);
+    expect(first!.rejected).toMatchObject({ reason: "format", notes: ["the model replied with nothing"] });
+    expect(first!.reviews).toEqual([]);
+    expect(second!.output).toBe("Something real");
+    await h.close();
+  });
+});

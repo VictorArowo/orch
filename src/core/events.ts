@@ -31,7 +31,7 @@ export interface Drafted {
   repairs: string[];
 }
 
-export type AttemptReason = "initial" | "check" | "critique" | "format" | "error" | "rerun";
+export type AttemptReason = "initial" | "check" | "critique" | "format" | "length" | "error" | "rerun";
 
 export type EventBody =
   | {
@@ -88,7 +88,8 @@ export type EventBody =
   // costKnown is false when the call may or may not have been billed (a crash
   // or an abort mid-call). Its whole reservation then counts as spent.
   | { type: "call.failed"; callId: string; error: string; costNanos: Nanos; costKnown: boolean }
-  | { type: "attempt.output"; attemptId: string; output: string; items?: string[]; formatError?: string }
+  // truncated: the model hit its token limit before finishing.
+  | { type: "attempt.output"; attemptId: string; output: string; items?: string[]; formatError?: string; truncated?: boolean }
   | {
       type: "review.decided";
       attemptId: string;
@@ -98,7 +99,7 @@ export type EventBody =
       notes: string[];
       votes: Vote[];
     }
-  | { type: "attempt.rejected"; attemptId: string; reason: "check" | "critique" | "format"; notes: string[] }
+  | { type: "attempt.rejected"; attemptId: string; reason: "check" | "critique" | "format" | "length"; notes: string[] }
   | { type: "step.done"; stepId: string; attemptId: string; warning?: string }
   | { type: "step.failed"; stepId: string; error: string }
   | { type: "step.blocked"; stepId: string; neededNanos: Nanos; availableNanos: Nanos }

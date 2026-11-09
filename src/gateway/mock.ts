@@ -5,7 +5,7 @@ import { mockListLength, mockPlan } from "./mock-plan.ts";
 // A deterministic stand-in for a real gateway: no key, no network. Replies are
 // derived from a hash of the request, so the same tree gives the same run.
 
-export type MockReply = string | { text: string; completionTokens?: number; costNanos?: number };
+export type MockReply = string | { text: string; completionTokens?: number; costNanos?: number; truncated?: boolean };
 
 export interface MockOptions {
   // Return a reply to override the default, or undefined to fall through.
@@ -86,6 +86,7 @@ export class MockGateway implements Gateway {
     const promptTokens = req.messages.reduce((n, m) => n + tokens(m.content) + 4, 0);
     const completionTokens = Math.min(r.completionTokens ?? tokens(r.text), req.maxTokens);
     const result: CompletionResult = { text: r.text, usage: { promptTokens, completionTokens } };
+    if (r.truncated) result.truncated = true;
     if (r.costNanos !== undefined) result.costNanos = r.costNanos;
     else if (this.opts.reportCost !== false) result.costNanos = costOf(await this.price(req.model), promptTokens, completionTokens);
     return result;

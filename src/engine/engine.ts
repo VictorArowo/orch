@@ -469,13 +469,18 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
           output: outputOf(state, id),
         }));
         const msgOpts: Parameters<typeof doMessages>[0] = { role: action.role, goal: state.goal, step: spec, inputs, notes: a.notes };
-        if (a.notes.length && previous?.output) msgOpts.previousOutput = previous.output;
+        // A review's notes refer to the previous draft, so show it. After a
+        // cut-off or malformed reply, start clean instead.
+        if (a.notes.length && previous?.output && (a.reason === "check" || a.reason === "critique")) msgOpts.previousOutput = previous.output;
+        // Each time a reply ran out of room, double the room.
+        const lengthRetries = epochAttempts(state, step).filter((x) => x.rejected?.reason === "length").length;
+        const baseTokens = spec.maxTokens ?? action.role.settings.maxTokens ?? DEFAULT_DO_TOKENS;
         const call: PlannedCall = {
           purpose: "do",
           role: action.role,
           model: a.model,
           messages: doMessages(msgOpts),
-          maxTokens: spec.maxTokens ?? action.role.settings.maxTokens ?? DEFAULT_DO_TOKENS,
+          maxTokens: Math.min(64_000, baseTokens * 2 ** lengthRetries),
         };
         const result = await this.callModels(job, a, [call]);
         if (result.kind !== "done") return result.kind;
@@ -490,7 +495,9 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
           return "continue";
         }
         const out: EventBody = { type: "attempt.output", attemptId: a.id, output: r.text };
-        if (spec.output === "list") {
+        if (r.truncated) out.truncated = true;
+        if (!r.text.trim() && !r.truncated) out.formatError = "the model replied with nothing";
+        else if (spec.output === "list") {
           try {
             out.items = parseList(r.text);
           } catch (err) {
@@ -560,7 +567,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     calls: PlannedCall[],
   ): Promise<
     | { kind: "wait" | "blocked" }
-    | { kind: "done"; results: ({ ok: true; text: string } | { ok: false; error: string; retryable: boolean })[] }
+    | { kind: "done"; results: ({ ok: true; text: string; truncated: boolean } | { ok: false; error: string; retryable: boolean })[] }
   > {
     const gateway = this.gatewayFor(this.cache.get(job.runId)!.owner);
     const prices = await Promise.all(calls.map((c) => gateway.price(c.model)));
@@ -620,7 +627,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
             costSource: res.costNanos !== undefined ? "gateway" : "computed",
             ms: Date.now() - started,
           };
-          return { event, result: { ok: true as const, text: res.text } };
+          return { event, result: { ok: true as const, text: res.text, truncated: res.truncated === true } };
         } catch (err) {
           if (err instanceof Killed) throw err;
           const error = redact(err instanceof Error ? err.message : String(err));

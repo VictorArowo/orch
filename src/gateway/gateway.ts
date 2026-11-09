@@ -14,6 +14,8 @@ export interface CompletionRequest {
 export interface CompletionResult {
   text: string;
   usage: Usage;
+  // True when the model hit its token limit before it finished replying.
+  truncated?: boolean;
   // The real cost if the gateway reports one; otherwise computed from the price.
   costNanos?: Nanos;
 }

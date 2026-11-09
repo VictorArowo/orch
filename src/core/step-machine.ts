@@ -12,13 +12,16 @@ export type StepAction =
   | { kind: "start-attempt"; role: Role; model: string; reason: AttemptReason; notes: string[]; n: number }
   | { kind: "do"; attempt: AttemptState; role: Role }
   | { kind: "review"; attempt: AttemptState; purpose: "check" | "critique"; role: Role }
-  | { kind: "reject"; attempt: AttemptState; reason: "check" | "critique" | "format"; notes: string[] }
+  | { kind: "reject"; attempt: AttemptState; reason: "check" | "critique" | "format" | "length"; notes: string[] }
   | { kind: "accept"; attempt: AttemptState; warning?: string }
   | { kind: "fail"; error: string };
 
 export const DEFAULT_MAX_RETRIES = 2;
 export const DEFAULT_CRITIQUE_ROUNDS = 1;
 export const MAX_CALL_ERRORS = 3;
+// A reply cut off at the token limit is retried with double the room, this many times.
+export const MAX_LENGTH_RETRIES = 2;
+export const LENGTH_NOTE = "Your previous reply ran out of room before it finished. Write the complete reply again; you have more room this time.";
 export const INTERRUPTED = "interrupted";
 
 export function doRoleFor(state: RunState, stepId: string): Role {
@@ -40,7 +43,9 @@ export function nextAction(state: RunState, stepId: string): StepAction {
     if (open.length) return { kind: "settle-interrupted", callIds: open };
   }
 
-  const sendBacks = attempts.filter((a) => a.rejected && a.rejected.reason !== "critique").length;
+  // Running out of room isn't the model's fault, so it doesn't climb the ladder.
+  const sendBacks = attempts.filter((a) => a.rejected?.reason === "check" || a.rejected?.reason === "format").length;
+  const lengthRetries = attempts.filter((a) => a.rejected?.reason === "length").length;
   const critiques = attempts.filter((a) => a.rejected?.reason === "critique").length;
   const role = doRoleFor(state, stepId);
 
@@ -60,12 +65,17 @@ export function nextAction(state: RunState, stepId: string): StepAction {
     return { kind: "do", attempt: last, role };
   }
 
+  // Out of room: try again with more, before anyone reviews a half-finished reply.
+  if (last.truncated && lengthRetries < MAX_LENGTH_RETRIES) {
+    return { kind: "reject", attempt: last, reason: "length", notes: [LENGTH_NOTE] };
+  }
+
   if (last.formatError) {
     if (sendBacks >= maxRetries) return { kind: "fail", error: `output was malformed after ${sendBacks + 1} tries: ${last.formatError}` };
     return { kind: "reject", attempt: last, reason: "format", notes: [last.formatError] };
   }
 
-  let warning: string | undefined;
+  let warning: string | undefined = last.truncated ? "the reply was cut off at the token limit, even with more room" : undefined;
   if (spec.check) {
     const review = last.reviews.find((r) => r.purpose === "check");
     if (!review) return { kind: "review", attempt: last, purpose: "check", role: findRole(state.panel, spec.check)! };

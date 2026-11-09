@@ -10,7 +10,7 @@ interface ModelsResponse {
 }
 
 interface ChatResponse {
-  choices?: { message?: { content?: string | null } }[];
+  choices?: { finish_reason?: string | null; message?: { content?: string | { type?: string; text?: string }[] | null } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
   error?: { message?: string; code?: number };
 }
@@ -93,9 +93,13 @@ export class OpenRouterGateway implements Gateway {
       const retryable = res.status === 429 || res.status >= 500 || res.status === 408;
       throw new GatewayError(clean(`OpenRouter error (${res.status}): ${msg}`), retryable);
     }
-    const content = json.choices?.[0]?.message?.content ?? "";
+    const choice = json.choices?.[0];
+    const raw = choice?.message?.content ?? "";
+    // Some providers send content as a list of parts.
+    const content = typeof raw === "string" ? raw : raw.map((p) => (p.type === "text" || !p.type ? (p.text ?? "") : "")).join("");
     const result: CompletionResult = {
       text: content,
+      truncated: choice?.finish_reason === "length",
       usage: {
         promptTokens: json.usage?.prompt_tokens ?? 0,
         completionTokens: json.usage?.completion_tokens ?? 0,

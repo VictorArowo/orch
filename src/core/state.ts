@@ -46,9 +46,10 @@ export interface AttemptState {
   output?: string;
   items?: string[];
   formatError?: string;
+  truncated?: boolean;
   reviews: ReviewState[];
   status: "running" | "rejected" | "accepted";
-  rejected?: { reason: "check" | "critique" | "format"; notes: string[] };
+  rejected?: { reason: "check" | "critique" | "format" | "length"; notes: string[] };
 }
 
 export interface StepState {
@@ -272,6 +273,7 @@ export function apply(state: RunState, e: RunEvent): RunState {
       a.output = e.output;
       if (e.items) a.items = e.items;
       if (e.formatError) a.formatError = e.formatError;
+      if (e.truncated) a.truncated = true;
       break;
     }
     case "review.decided":
