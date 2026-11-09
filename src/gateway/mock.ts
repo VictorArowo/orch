@@ -1,5 +1,6 @@
 import { costOf, priceFromUsdPerToken, type Price } from "../core/money.js";
 import type { CompletionRequest, CompletionResult, Gateway } from "./gateway.js";
+import { mockListLength, mockPlan } from "./mock-plan.js";
 
 // A deterministic stand-in for a real gateway: no key, no network. Replies are
 // derived from a hash of the request, so the same tree gives the same run.
@@ -54,7 +55,7 @@ const PHRASES = [
   "has an active community and frequent releases",
 ];
 
-const LIST_POOL = ["Option A", "Option B", "Option C", "Option D", "Option E"];
+const LIST_POOL = ["Option A", "Option B", "Option C", "Option D", "Option E", "Option F", "Option G", "Option H", "Option I", "Option J"];
 
 export class MockGateway implements Gateway {
   readonly name = "mock";
@@ -95,6 +96,10 @@ export class MockGateway implements Gateway {
     const user = req.messages[req.messages.length - 1]?.content ?? "";
     const h = hash(`${req.model}|${user}`);
 
+    if (purpose === "plan") {
+      const prompt = req.messages.find((m) => m.role === "user")?.content ?? "";
+      return JSON.stringify(mockPlan(prompt), null, 2);
+    }
     if (purpose === "check") {
       const seen = this.checksSeen.get(stepId) ?? 0;
       this.checksSeen.set(stepId, seen + 1);
@@ -112,7 +117,11 @@ export class MockGateway implements Gateway {
         objections: objects ? ["The recommendation ignores the cost of running it yourself at small scale."] : [],
       });
     }
-    if (output === "list") return JSON.stringify(LIST_POOL);
+    if (output === "list") {
+      // As many items as the step's own wording asks for, five by default.
+      const step = user.slice(user.indexOf("Your step:"));
+      return JSON.stringify(LIST_POOL.slice(0, mockListLength(step)));
+    }
 
     const title = /Your step: (.*)/.exec(user)?.[1] ?? stepId;
     const subject = /This step is for: (.*)/.exec(user)?.[1] ?? title;

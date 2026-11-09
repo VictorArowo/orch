@@ -8,7 +8,7 @@ export interface CompletionRequest {
   maxTokens: number;
   settings: RoleSettings;
   // Not sent to real models. The mock gateway uses it to shape its replies.
-  meta: { purpose: Purpose; stepId: string; output: "text" | "list" };
+  meta: { purpose: Purpose | "plan"; stepId: string; output: "text" | "list" };
 }
 
 export interface CompletionResult {
