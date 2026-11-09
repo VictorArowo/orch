@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { PanelNote } from "@/components/PanelNote";
 import { Button, ErrorNote, Field, inputClass } from "@/components/ui";
 import { get, post, type PanelEntry } from "@/lib/api";
 import { useMe, useSession, type Me } from "@/lib/session";
@@ -147,9 +148,6 @@ function Keys({ me }: { me: Me }) {
 
   return (
     <div className="flex max-w-xl flex-col gap-5">
-      {me.gateway === "mock" && (
-        <p className="note text-[14px] text-graphite">This engine is running on mock models, so nothing needs a key right now. A key you add here is used once it runs on OpenRouter.</p>
-      )}
       {key ? (
         <div className="rounded-[6px] border border-ink/20 bg-sheet px-5 py-4">
           <div className="flex items-baseline justify-between gap-4">
@@ -279,7 +277,7 @@ function Defaults({ me }: { me: Me }) {
         });
       }}
     >
-      <Field label="Panel for new plans">
+      <Field label="Panel for new plans" hint="A panel is the cast: which model plays each role in a plan.">
         <select className={`${inputClass} w-full py-2`} value={panel} onChange={(e) => setPanel(e.target.value)}>
           {panels.map((p) => (
             <option key={p.name} value={p.name}>
@@ -288,6 +286,7 @@ function Defaults({ me }: { me: Me }) {
           ))}
         </select>
       </Field>
+      <PanelNote panel={panels.find((p) => p.name === panel)?.panel} compact />
       <Field label="Spend at most, per run ($)" hint="Leave empty to start from each plan's high estimate.">
         <input className={`${inputClass} tnum w-40 py-2`} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} placeholder="0.50" />
       </Field>

@@ -11,6 +11,7 @@ import { addChild, moveStep, removeStep, setGoal, updateStep, type StepPatch } f
 import { viewOfSpec, type ViewNode } from "orch/src/view/view.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, type CardInfo } from "./Canvas";
+import { PanelNote } from "./PanelNote";
 import { StepForm } from "./StepForm";
 import { Button, ErrorNote, inputClass, shortModel } from "./ui";
 import { get, post, type CheckResponse, type PanelEntry } from "@/lib/api";
@@ -261,6 +262,7 @@ export function Editor() {
             </Button>
           </div>
         </div>
+        <PanelNote panel={panel} compact />
         {((check && !check.ok) || editError || saved || over || drafted) && (
           <div className="flex flex-col gap-1.5 pt-1 text-[13px]">
             {check && !check.ok && <ErrorNote>{check.error}</ErrorNote>}

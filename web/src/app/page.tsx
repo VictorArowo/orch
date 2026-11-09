@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatUsd } from "orch/src/core/money.ts";
+import { formatUsd, usdToNanos } from "orch/src/core/money.ts";
 import { useEffect, useState } from "react";
 import { Landing } from "@/components/Landing";
+import { PanelNote } from "@/components/PanelNote";
 import { Button, ErrorNote, Status } from "@/components/ui";
 import { get, post, type Config, type Examples, type PanelEntry, type PlanResponse, type RunListItem } from "@/lib/api";
 import { saveDraft } from "@/lib/draft";
@@ -104,7 +105,7 @@ function Workspace({ me }: { me: Me }) {
           </label>
           {config && (
             <span className="note text-[13px] text-graphite">
-              {config.gateway === "mock" ? "Mock models: nothing here costs money." : `Real models. Drafting costs at most $${config.planCapUsd.toFixed(2)}.`}
+              Drafting costs at most {formatUsd(usdToNanos(me.user.settings.planCapUsd ?? config.planCapUsd))}, on your OpenRouter key.
             </span>
           )}
           {panels.length > 0 && !planner && <span className="note text-[13px] text-red">This panel has no plan role, so it can't draft.</span>}
@@ -114,6 +115,7 @@ function Workspace({ me }: { me: Me }) {
             </Link>
           )}
         </div>
+        {panels.length > 0 && <PanelNote panel={panels.find((p) => p.name === panel)?.panel} />}
         {error && (
           <div className="mt-5">
             <ErrorNote>{error}</ErrorNote>

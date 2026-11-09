@@ -36,7 +36,6 @@ export default function RunsPage() {
                 <span className="tnum text-[13px] text-ink-soft">
                   {formatUsd(r.spentNanos)} of {formatUsd(r.cap)}
                 </span>
-                {r.gateway === "mock" && <span className="note text-[13px] text-graphite">mock</span>}
                 <Status status={r.status} />
               </Link>
             </li>

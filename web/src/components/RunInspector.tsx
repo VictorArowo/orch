@@ -137,7 +137,7 @@ export function RunInspector({ state, selected }: { state: RunState; selected?: 
     return (
       <div className="flex flex-col gap-4">
         <p className="text-[14px] text-ink-soft">
-          Cast from the <span className="font-semibold text-ink">{state.panel.name}</span> panel, on {state.gateway === "mock" ? "mock models" : "OpenRouter"}.
+          Cast from the <span className="font-semibold text-ink">{state.panel.name}</span> panel.
           {state.drafted && ` Drafting the plan cost ${formatUsd(state.drafted.costNanos)}.`}
         </p>
         {state.status === "done" ? (

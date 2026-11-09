@@ -1,0 +1,54 @@
+{
+  "name": "open-weights",
+  "description": "Only open-weight models: DeepSeek, Qwen, Kimi and Llama.",
+  "roles": [
+    {
+      "name": "planner",
+      "job": "plan",
+      "instructions": "Break the goal into a small tree of concrete steps. Prefer fewer, larger steps.",
+      "model": "moonshotai/kimi-k3.1-pro"
+    },
+    {
+      "name": "researcher",
+      "job": "do",
+      "instructions": "Be factual and specific. Say when you are unsure rather than guessing.",
+      "ladder": ["deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4-pro-0813"],
+      "settings": { "maxTokens": 900, "temperature": 0.3 }
+    },
+    {
+      "name": "analyst",
+      "job": "do",
+      "instructions": "Compare like with like and keep tables tight.",
+      "model": "qwen/qwen3.8-27b",
+      "settings": { "maxTokens": 1500 }
+    },
+    {
+      "name": "writer",
+      "job": "do",
+      "instructions": "Write plainly and lead with the answer.",
+      "model": "moonshotai/kimi-k3.1-pro",
+      "settings": { "maxTokens": 1500 }
+    },
+    {
+      "name": "fact-checker",
+      "job": "check",
+      "instructions": "Only send work back for claims that are wrong or missing, not for style.",
+      "model": "qwen/qwen3.8-flash",
+      "settings": { "maxTokens": 400 }
+    },
+    {
+      "name": "editor",
+      "job": "check",
+      "instructions": "Check the draft answers the question asked and is internally consistent.",
+      "jury": ["qwen/qwen3.8-flash", "deepseek/deepseek-v4.1-flash", "meta-llama/llama-4-maverick"],
+      "settings": { "maxTokens": 400 }
+    },
+    {
+      "name": "critic",
+      "job": "critique",
+      "instructions": "You are a sceptical expert reviewer. Push on unsupported claims, missing options, cost and risk.",
+      "model": "deepseek/deepseek-v4-pro-0813",
+      "settings": { "maxTokens": 600 }
+    }
+  ]
+}

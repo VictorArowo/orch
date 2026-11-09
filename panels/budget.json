@@ -1,0 +1,54 @@
+{
+  "name": "budget",
+  "description": "As cheap as it gets: small, fast models in every role. Good for trying a plan out before spending more on it.",
+  "roles": [
+    {
+      "name": "planner",
+      "job": "plan",
+      "instructions": "Break the goal into a small tree of concrete steps. Prefer fewer, larger steps.",
+      "model": "openai/gpt-5.6-luna"
+    },
+    {
+      "name": "researcher",
+      "job": "do",
+      "instructions": "Be factual and specific. Say when you are unsure rather than guessing.",
+      "ladder": ["deepseek/deepseek-v4.1-flash", "google/gemini-3.5-flash-lite"],
+      "settings": { "maxTokens": 900, "temperature": 0.3 }
+    },
+    {
+      "name": "analyst",
+      "job": "do",
+      "instructions": "Compare like with like and keep tables tight.",
+      "model": "qwen/qwen3.8-27b",
+      "settings": { "maxTokens": 1500 }
+    },
+    {
+      "name": "writer",
+      "job": "do",
+      "instructions": "Write plainly and lead with the answer.",
+      "model": "openai/gpt-5.6-luna",
+      "settings": { "maxTokens": 1500 }
+    },
+    {
+      "name": "fact-checker",
+      "job": "check",
+      "instructions": "Only send work back for claims that are wrong or missing, not for style.",
+      "model": "qwen/qwen3.8-flash",
+      "settings": { "maxTokens": 400 }
+    },
+    {
+      "name": "editor",
+      "job": "check",
+      "instructions": "Check the draft answers the question asked and is internally consistent.",
+      "jury": ["qwen/qwen3.8-flash", "deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5"],
+      "settings": { "maxTokens": 400 }
+    },
+    {
+      "name": "critic",
+      "job": "critique",
+      "instructions": "You are a sceptical expert reviewer. Push on unsupported claims, missing options, cost and risk.",
+      "model": "anthropic/claude-haiku-5.5",
+      "settings": { "maxTokens": 600 }
+    }
+  ]
+}

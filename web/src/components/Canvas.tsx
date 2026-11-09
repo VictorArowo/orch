@@ -254,7 +254,6 @@ function Inner({ root, info, selected, onSelect, active, still }: CanvasProps) {
       preventScrolling={!still}
       fitView
       fitViewOptions={{ padding: 0.12 }}
-      proOptions={{ hideAttribution: true }}
       colorMode="light"
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#d3d6d0" />

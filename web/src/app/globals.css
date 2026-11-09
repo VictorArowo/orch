@@ -188,3 +188,11 @@ body {
   font-weight: 600;
   border-bottom-color: var(--color-ink);
 }
+
+.react-flow__attribution {
+  background: transparent;
+  font-size: 10px;
+}
+.react-flow__attribution a {
+  color: var(--color-graphite-light);
+}

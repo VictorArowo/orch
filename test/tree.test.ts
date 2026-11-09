@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parsePanel } from "../src/core/panel.ts";
 import { DEFAULT_LIMITS, expandTemplate, parseTree, validateTree } from "../src/core/tree.ts";
@@ -74,5 +74,28 @@ describe("panels", () => {
   it("needs a do role and exactly one model spec per role", () => {
     expect(() => parsePanel({ name: "p", roles: [{ name: "c", job: "check", model: "x" }] })).toThrow(/no do role/);
     expect(() => parsePanel({ name: "p", roles: [{ name: "d", job: "do", model: "x", ladder: ["a", "b"] }] })).toThrow(/exactly one/);
+  });
+});
+
+describe("shipped panels", () => {
+  const dir = "panels";
+  const panels = readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => parsePanel(JSON.parse(readFileSync(`${dir}/${f}`, "utf8"))));
+  const roleNames = (p: (typeof panels)[number]) => p.roles.map((r) => `${r.name}:${r.job}`).sort();
+  const starter = panels.find((p) => p.name === "starter")!;
+  const trees = [
+    "examples/vector-dbs.tree.json",
+    ...readdirSync("examples/planned").map((f) => `examples/planned/${f}`),
+  ].map((f) => parseTree(JSON.parse(readFileSync(f, "utf8"))));
+
+  it("ships several panels, each with a description", () => {
+    expect(panels.length).toBeGreaterThanOrEqual(5);
+    for (const p of panels) expect(p.description?.length).toBeGreaterThan(20);
+  });
+
+  it.each(panels.map((p) => [p.name, p]))("%s casts the same roles as the starter panel, so any tree runs on it", (_name, p) => {
+    expect(roleNames(p)).toEqual(roleNames(starter));
+    for (const t of trees) expect(() => validateTree(t, p, DEFAULT_LIMITS)).not.toThrow();
   });
 });

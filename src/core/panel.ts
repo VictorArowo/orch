@@ -30,6 +30,8 @@ export interface Role {
 
 export interface Panel {
   name: string;
+  // One line on who plays what, shown wherever a panel is picked.
+  description?: string;
   roles: Role[];
 }
 
@@ -57,6 +59,7 @@ const roleSchema = z
 const panelSchema = z
   .object({
     name: z.string().min(1),
+    description: z.string().max(300).optional(),
     roles: z.array(roleSchema).min(1),
   })
   .strict();
@@ -88,7 +91,9 @@ export function parsePanel(input: unknown): Panel {
     return { name: r.name, job: r.job, instructions: r.instructions, tools: r.tools, models, settings: r.settings };
   });
   if (!roles.some((r) => r.job === "do")) throw new PanelError(`panel "${parsed.data.name}" has no do role`);
-  return { name: parsed.data.name, roles };
+  const panel: Panel = { name: parsed.data.name, roles };
+  if (parsed.data.description) panel.description = parsed.data.description;
+  return panel;
 }
 
 export function findRole(panel: Panel, name: string): Role | undefined {

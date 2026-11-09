@@ -1,5 +1,6 @@
 {
   "name": "starter",
+  "description": "A sensible default. Cheap models research and step up a rung when their work is sent back, Gemini Flash compares, Claude Sonnet writes, and a critic from another family pushes back.",
   "roles": [
     {
       "name": "planner",
