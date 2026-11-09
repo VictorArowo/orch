@@ -1,10 +1,10 @@
 # orch
 
-You give orch a goal and a tree of steps for reaching it. You decide which roles and models handle which steps, then watch the tree run: parallel branches fan out, outputs flow to the steps that read them, optional checkers send work back, and spend ticks up against a hard cap.
+You give orch a goal. It drafts a plan as a tree of steps, some in sequence and some in parallel. You decide which roles and models handle which steps, and what each run may spend, then watch it run: parallel branches fan out, outputs flow to the steps that read them, checkers send work back, and spend ticks up against a hard cap.
 
-This covers milestones 1 and 2 of [PLAN.md](PLAN.md): the engine, a CLI, and a planner that drafts the tree from a goal. Trees are JSON files, so you can edit a drafted tree, or write one by hand, before running it.
+It covers milestones 1 to 3 of [PLAN.md](PLAN.md), plus accounts and stored keys from milestone 5: the engine, a CLI, the planner, and a web app where each account drafts, edits and runs its own trees on its own OpenRouter key.
 
-## Running it
+## The web app
 
 You need Node 22 and pnpm.
 
@@ -12,13 +12,46 @@ You need Node 22 and pnpm.
 pnpm install
 ```
 
-Try the example with mock models first. It needs no key and costs nothing:
+Start the engine service and the web app together, on mock models that cost nothing:
+
+```bash
+pnpm dev --mock
+```
+
+Open http://localhost:3000, create an account, and draft a plan from one of the example goals. The editor shows the tree on a canvas with a cost estimate per step. Click a step to change its instructions, role, model or reviewers. Run it, and the tree fills in live: steps not started are pencilled in, the steps working now are highlighted, finished ones are inked. Click any step to see what it was told, what it did, who reviewed it and what each call cost.
+
+To use real models, start it without `--mock`:
+
+```bash
+pnpm dev
+```
+
+Then add a key in Settings, under API keys. Connect with OpenRouter creates a key for orch in your OpenRouter account through OpenRouter's OAuth flow; you can set a spending limit on it, or revoke it, from your OpenRouter dashboard. Pasting a key works too. Either way the key is encrypted before it's stored, decrypted only while a call is being made, and never shown again. OpenRouter bills you directly; orch never handles payment.
+
+Settings also covers your profile, password, default panel and spending limits, and deleting the account (which deletes its runs, saved trees and stored key).
+
+`pnpm dev` runs `orch serve` on port 4317 and the Next.js app on port 3000, which forwards `/api` to the engine. To run them separately, use `pnpm serve` and `pnpm --filter web dev`.
+
+### Accounts and keys
+
+Accounts live in the engine service, next to runs, so the embedded database works without a separate auth server.
+
+- Passwords are hashed with scrypt. Sessions are random tokens in HttpOnly, SameSite=Lax cookies, stored only as hashes, and expire after 30 days. Changing the password signs out other devices. Sign-in attempts are rate-limited.
+- Requests that change anything must be JSON, which browsers won't send cross-site without a CORS preflight the service never grants. Together with SameSite cookies, that blocks CSRF.
+- Each stored key is encrypted with its own AES-256-GCM data key, bound to its account, and the data key is encrypted with a master key kept outside the database. A copy of the database alone exposes nothing usable. Set `ORCH_MASTER_KEY` in production; locally, `orch serve` makes one in `.orch/master.key`. `ORCH_MASTER_KEYS` lists several versions for rotation.
+- Runs and saved trees belong to the account that made them, and every route checks ownership.
+
+Set `ORCH_SECURE_COOKIES=1` when serving over HTTPS. Sign-in with GitHub or Google isn't built yet.
+
+## The command line
+
+The CLI runs trees locally without accounts, using `OPENROUTER_API_KEY` from `.env`. Try the example with mock models first:
 
 ```bash
 pnpm orch run examples/vector-dbs.tree.json --panel panels/starter.json --cap 0.50 --mock
 ```
 
-To run it against real models through OpenRouter, copy `.env.example` to `.env` and put your OpenRouter key in it. orch reads the key from there and never prints or stores it.
+To run it against real models, copy `.env.example` to `.env` and put your OpenRouter key in it. orch reads the key from there and never prints or stores it.
 
 ```bash
 cp .env.example .env
@@ -46,7 +79,7 @@ Press Ctrl-C once to pause a run after the calls in flight finish. Press it twic
 
 ### Storage
 
-Runs, events and the job queue live in Postgres. By default orch uses an embedded Postgres (PGlite) in `.orch/db`, so nothing else needs to be running. To use a real server instead, start the one in `docker-compose.yml` and point `DATABASE_URL` at it (`.env.example` has the URL):
+Accounts, runs, events and the job queue live in Postgres. By default orch uses an embedded Postgres (PGlite) in `.orch/db`, so nothing else needs to be running. To use a real server instead, start the one in `docker-compose.yml` and point `DATABASE_URL` at it (`.env.example` has the URL):
 
 ```bash
 pnpm db:up
@@ -62,6 +95,7 @@ orch resume <run-id> [--cap <usd>]
 orch rerun <run-id> <step-id>... [--model <id>]
 orch show <run-id> [<step-id>]
 orch runs
+orch serve [--port <n>] [--mock]
 ```
 
 Drafting a tree may spend up to `--plan-cap` (default $0.10) across its attempts. With `run --goal` that cost also counts against the run's cap. `plan` and `run` also take `--max-depth`, `--max-fan-out` and `--max-steps`. Every command takes `--db` to pick a database and `--no-live` to print events line by line instead of redrawing the tree. Use `pnpm orch ...` from the repo, or `pnpm build && pnpm link --global` for a plain `orch` command.
@@ -132,7 +166,7 @@ Re-running a step starts a new attempt and keeps the old ones. Each attempt reco
 pnpm test
 ```
 
-The tests use the mock gateway and an in-memory PGlite, so they need no key, network or Docker. They cover the planner (repairs, retries and its cap), estimates, the scheduler, reservations and reconciliation, pausing on the cap, ladders, checks, juries and critiques, stale tracking on re-runs, and resuming after a simulated crash. To run the store tests against the Docker Postgres as well:
+The tests use the mock gateway and an in-memory PGlite, so they need no key, network or Docker. They cover accounts, sessions and key encryption, the engine service and its event streams, the canvas layout and tree edits, the planner (repairs, retries and its cap), estimates, the scheduler, reservations and reconciliation, pausing on the cap, ladders, checks, juries and critiques, stale tracking on re-runs, and resuming after a simulated crash. To run the store tests against the Docker Postgres as well:
 
 ```bash
 ORCH_TEST_DATABASE_URL=postgres://orch:orch@localhost:5433/orch pnpm test
@@ -144,6 +178,9 @@ ORCH_TEST_DATABASE_URL=postgres://orch:orch@localhost:5433/orch pnpm test
 src/core      panels, trees, events, the state fold, budget maths, estimates, prompts, the step state machine
 src/store     the Store interface and its SQL implementation for Postgres and PGlite
 src/planner   the planner prompt, plan repairs, and the retry loop
+src/server    the engine service: accounts, sessions, encrypted keys, saved trees, runs and event streams
+src/view      the canvas's view of a tree or a run, its layout, and the editor's tree edits
+web/          the Next.js app
 src/gateway   OpenRouter, the mock (including mock plans), and key redaction
 src/engine    the scheduler and workers
 src/cli       the orch command and its tree view
