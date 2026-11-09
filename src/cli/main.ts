@@ -32,9 +32,10 @@ import type { Gateway } from "../gateway/gateway.ts";
 import { hash, MockGateway } from "../gateway/mock.ts";
 import { OpenRouterGateway } from "../gateway/openrouter.ts";
 import { redact } from "../gateway/redact.ts";
+import { loadMasterKeys } from "../server/crypto.ts";
 import { serve } from "../server/server.ts";
 import { describeTarget, openStore } from "../store/open.ts";
-import type { Store } from "../store/store.ts";
+import type { SqlStore } from "../store/sql-store.ts";
 import { modelsUsed, renderPlan, renderSummary, renderTree } from "./render.ts";
 
 const USAGE = `orch: run a tree of steps with the roles and models you choose.
@@ -113,7 +114,7 @@ function int(flag: string | undefined): number | undefined {
   return n;
 }
 
-async function connect(flags: Flags): Promise<Store> {
+async function connect(flags: Flags): Promise<SqlStore> {
   const target = flags.db ?? process.env.DATABASE_URL ?? ".orch/db";
   try {
     return await openStore(target);
@@ -557,12 +558,26 @@ async function cmdRuns(flags: Flags) {
 }
 
 async function cmdServe(flags: Flags) {
-  const gateway = gatewayFor(flags.mock ? "mock" : "openrouter");
+  const mode = flags.mock ? "mock" : "openrouter";
+  // Stored keys are encrypted with a master key kept outside the database.
+  // Locally one is made in .orch/master.key if ORCH_MASTER_KEY isn't set.
+  const generated = !process.env.ORCH_MASTER_KEY && !process.env.ORCH_MASTER_KEYS && !existsSync(".orch/master.key");
+  const master = loadMasterKeys(process.env, ".orch/master.key");
+  if (generated) console.log("Made a master key for stored API keys in .orch/master.key. In production, set ORCH_MASTER_KEY instead.");
   const store = await connect(flags);
   const planCapUsd = flags["plan-cap"] !== undefined ? money(flags["plan-cap"], "--plan-cap") / 1e9 : DEFAULT_PLAN_CAP_USD;
-  const secrets = process.env.OPENROUTER_API_KEY ? [process.env.OPENROUTER_API_KEY] : [];
-  const server = await serve({ store, gateway, root: process.cwd(), port: int(flags.port) ?? 4317, planCapUsd, secrets });
-  console.log(`orch engine on ${server.url} using ${gateway.name === "mock" ? "mock models" : "OpenRouter"}. Ctrl-C to stop.`);
+  const serveOpts: Parameters<typeof serve>[0] = {
+    store,
+    mode,
+    master,
+    root: process.cwd(),
+    port: int(flags.port) ?? 4317,
+    planCapUsd,
+    secureCookies: process.env.ORCH_SECURE_COOKIES === "1",
+  };
+  if (mode === "mock") serveOpts.mockGateway = gatewayFor("mock");
+  const server = await serve(serveOpts);
+  console.log(`orch engine on ${server.url}, ${mode === "mock" ? "on mock models" : "on each account's own OpenRouter key"}. Ctrl-C to stop.`);
   await new Promise<void>((resolve) => process.once("SIGINT", () => resolve()));
   console.log("Stopping: pausing runs in progress…");
   await server.close();
