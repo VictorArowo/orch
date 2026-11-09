@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:up": "docker compose up -d --wait",
-    "plan:goals": "tsx scripts/plan-goals.ts"
+    "plan:goals": "tsx scripts/plan-goals.ts",
+    "serve": "tsx src/cli/main.ts serve",
+    "dev": "tsx scripts/dev.ts"
   },
   "engines": {
     "node": ">=22"
