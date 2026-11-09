@@ -196,3 +196,26 @@ body {
 .react-flow__attribution a {
   color: var(--color-graphite-light);
 }
+
+/* Selects drop the browser's own styling, whose padding and arrow differ
+   from the text inputs beside them, and draw one chevron instead. */
+@layer base {
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%237a7f87' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 12px 12px;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+}
+
+/* A select that sits inside a sentence, on a dashed underline. */
+@layer components {
+  .select-inline {
+    background-position: right 0 center;
+    padding-right: 1.1rem;
+  }
+}

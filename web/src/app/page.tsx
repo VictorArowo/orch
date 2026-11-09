@@ -91,7 +91,7 @@ function Workspace({ me }: { me: Me }) {
           <label className="flex items-center gap-2 text-[14px] text-ink-soft">
             with the
             <select
-              className="border-0 border-b border-dashed border-graphite bg-transparent pr-1 text-[14px] font-medium text-ink focus:border-blue focus:outline-none"
+              className="select-inline border-0 border-b border-dashed border-graphite bg-transparent text-[14px] font-medium text-ink focus:border-blue focus:outline-none"
               value={panel}
               onChange={(e) => setPanel(e.target.value)}
             >

@@ -217,7 +217,7 @@ export function Editor() {
           <label className="flex items-center gap-1.5">
             Cast from the
             <select
-              className="border-0 border-b border-dashed border-graphite bg-transparent font-medium text-ink focus:border-blue focus:outline-none"
+              className="select-inline border-0 border-b border-dashed border-graphite bg-transparent font-medium text-ink focus:border-blue focus:outline-none"
               value={panelName}
               onChange={(e) => setPanelName(e.target.value)}
             >
