@@ -63,7 +63,7 @@ function fit(s: string, width: number): string {
     visible++;
     i++;
   }
-  return out + "…" + ANSI.reset;
+  return out + "…" + (out.includes("\x1b[") ? ANSI.reset : "");
 }
 
 function pad(s: string, n: number): string {
@@ -133,6 +133,8 @@ export function renderTree(state: RunState, opts: RenderOptions): string[] {
       const models = modelsUsed(state, step);
       if (models.length) cols.push(models.join(" → "));
       if (step.attemptIds.length > 1) cols.push(`${step.attemptIds.length} attempts`);
+      const open = att?.callIds.map((c) => state.calls[c]!).find((c) => c.status === "open");
+      if (open) cols.push(paint("yellow", { do: "working", check: "checking", critique: "critiquing" }[open.purpose]));
     } else {
       const kids = step.childIds;
       const done = kids.filter((k) => stepStatus(state, k) === "done").length;

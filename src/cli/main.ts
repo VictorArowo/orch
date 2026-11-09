@@ -101,7 +101,7 @@ function gatewayFor(kind: string): Gateway {
 // Show the tree while the run works: redrawn in place on a terminal, or as
 // one line per event when output is piped.
 function watch(engine: Engine, runId: string, live: boolean): () => void {
-  const width = () => process.stdout.columns ?? 120;
+  const width = () => process.stdout.columns || 120;
   if (!live) {
     const handler = (e: { type: string; seq: number } & Record<string, unknown>) => {
       const bits = [e.type, e.stepId ?? e.attemptId ?? e.callId ?? ""].filter(Boolean);
@@ -160,7 +160,7 @@ async function driveWithUi(engine: Engine, runId: string, flags: Flags): Promise
 }
 
 function report(state: RunState) {
-  const width = process.stdout.columns ?? 120;
+  const width = process.stdout.columns || 120;
   const color = process.stdout.isTTY === true;
   console.log("");
   for (const line of renderSummary(state, { color, width })) console.log(line);
@@ -179,7 +179,7 @@ function report(state: RunState) {
       const left = Math.max(0, state.cap - state.spentNanos);
       console.log(`The next call needs up to ${formatUsd(state.neededNanos)} and ${formatUsd(left)} is left.`);
     }
-    console.log(`Resume with: orch resume ${state.runId} --cap <usd>`);
+    console.log(`Resume with: orch resume ${state.runId}${state.neededNanos ? " --cap <usd>" : ""}`);
   } else if (state.status === "stopped") {
     console.log(`Stopped: ${state.reason}`);
   }
@@ -251,7 +251,7 @@ async function cmdRerun(args: string[], flags: Flags) {
 async function cmdShow(args: string[], flags: Flags) {
   const [runId, stepId] = args;
   await withRun(runId, flags, async (_engine, state) => {
-    const width = process.stdout.columns ?? 120;
+    const width = process.stdout.columns || 120;
     const color = process.stdout.isTTY === true;
     if (!stepId) {
       for (const line of renderTree(state, { color, width })) console.log(line);
