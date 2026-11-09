@@ -1,4 +1,7 @@
+import type { TreeEstimate } from "../core/estimate.js";
 import { formatUsd } from "../core/money.js";
+import { defaultDoRole, findRole, modelsOf, type Panel } from "../core/panel.js";
+import type { StepSpec, Tree } from "../core/tree.js";
 import { isLeaf, isStale, stepCost, stepStatus, treeOrder, type RunState, type StepState, type StepStatus } from "../core/state.js";
 
 export interface RenderOptions {
@@ -198,6 +201,60 @@ export function renderSummary(state: RunState, opts: RenderOptions): string[] {
   out.push("");
   const summary = `Total ${formatUsd(state.spentNanos)} of ${formatUsd(state.cap)} cap`;
   const unknown = Object.values(state.calls).filter((c) => !c.costKnown && c.status === "failed").length;
-  out.push(paint("bold", summary) + (unknown ? paint("dim", ` (includes ${unknown} interrupted call${unknown > 1 ? "s" : ""} counted at worst case)`) : ""));
+  const notes: string[] = [];
+  if (state.drafted) notes.push(`${formatUsd(state.drafted.costNanos)} for drafting the tree`);
+  if (unknown) notes.push(`${unknown} interrupted call${unknown > 1 ? "s" : ""} counted at worst case`);
+  out.push(paint("bold", summary) + (notes.length ? paint("dim", ` (includes ${notes.join(" and ")})`) : ""));
   return out;
+}
+
+// A drafted tree before it runs: each step's role, models, reviews and cost
+// estimate. Fan-outs over another step's list show their template.
+export function renderPlan(tree: Tree, panel: Panel, estimate: TreeEstimate, opts: RenderOptions): string[] {
+  const paint = painter(opts.color);
+  const range = (r: { low: number; high: number }) => paint("dim", `${formatUsd(r.low)}–${formatUsd(r.high)}`);
+  const lines: string[] = [paint("dim", tree.goal), ""];
+
+  const describe = (s: StepSpec): string[] => {
+    const cols: string[] = [];
+    if (s.mode === "leaf") {
+      const role = s.role ? findRole(panel, s.role) : defaultDoRole(panel);
+      cols.push(paint("cyan", role?.name ?? "?"));
+      cols.push(s.model ? shortModel(s.model) : role ? modelsOf(role.models).map(shortModel).join(" → ") : "");
+      if (s.output === "list") cols.push(paint("dim", "returns a list"));
+    } else if (s.itemsFrom) {
+      cols.push(paint("dim", `parallel, one branch per item from ${s.itemsFrom}`));
+    } else {
+      cols.push(paint("dim", `${s.mode}`));
+    }
+    if (s.inputs?.length) cols.push(paint("dim", `reads ${s.inputs.join(", ")}`));
+    if (s.check) cols.push(`check ${s.check}`);
+    if (s.critique) cols.push(`critique ${s.critique}`);
+    return cols;
+  };
+
+  const visit = (s: StepSpec, prefix: string, last: boolean, isRoot: boolean, label?: string) => {
+    const branch = isRoot ? "" : last ? "└─ " : "├─ ";
+    const est = estimate.steps[s.id];
+    const cols = describe(s);
+    if (est) {
+      cols.push(range(est));
+      if (est.branches) {
+        const b = est.branches;
+        cols.push(paint("dim", b.low === b.high ? `assumes ${b.low} branches` : `assumes ${b.low}–${b.high} branches`));
+      }
+    }
+    lines.push(fit(`${prefix}${branch}${paint("bold", label ?? s.id)} ${s.title}  ${cols.join(paint("dim", " · "))}`, opts.width));
+    const childPrefix = isRoot ? "" : prefix + (last ? "   " : "│  ");
+    if (s.itemsFrom && s.template) {
+      visit(s.template, childPrefix, true, false, "each");
+      return;
+    }
+    s.children.forEach((c, i) => visit(c, childPrefix, i === s.children.length - 1, false));
+  };
+  visit(tree.root, "", true, true);
+  const t = estimate.total;
+  lines.push("");
+  lines.push(`Estimate ${formatUsd(t.low)}–${formatUsd(t.high)} over ${t.calls.low}–${t.calls.high} model calls`);
+  return lines;
 }

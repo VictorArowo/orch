@@ -1,10 +1,16 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
+import { treeToJson } from "../core/check-tree.js";
+import { estimateTree } from "../core/estimate.js";
+import type { Drafted } from "../core/events.js";
 import { formatUsd, usdToNanos } from "../core/money.js";
-import { parsePanel } from "../core/panel.js";
+import { modelsOf, parsePanel, type Panel } from "../core/panel.js";
 import { isLeaf, outputOf, isStale, treeOrder, type RunState } from "../core/state.js";
-import { parseTree, type Limits } from "../core/tree.js";
+import { DEFAULT_LIMITS, parseTree, type Limits, type Tree } from "../core/tree.js";
+import { plan, PlanError, planRole, type PlanResult } from "../planner/planner.js";
 import { Engine } from "../engine/engine.js";
 import type { Gateway } from "../gateway/gateway.js";
 import { hash, MockGateway } from "../gateway/mock.js";
@@ -12,19 +18,24 @@ import { OpenRouterGateway } from "../gateway/openrouter.js";
 import { redact } from "../gateway/redact.js";
 import { describeTarget, openStore } from "../store/open.js";
 import type { Store } from "../store/store.js";
-import { modelsUsed, renderSummary, renderTree } from "./render.js";
+import { modelsUsed, renderPlan, renderSummary, renderTree } from "./render.js";
 
 const USAGE = `orch: run a tree of steps with the roles and models you choose.
 
 Usage:
+  orch plan "<goal>" --panel <panel.json> [--out <file>] [--plan-cap <usd>]
   orch run <tree.json> --panel <panel.json> --cap <usd> [options]
+  orch run --goal "<goal>" --panel <panel.json> --cap <usd> [--yes] [options]
   orch resume <run-id> [--cap <usd>]
   orch rerun <run-id> <step-id>... [--model <id>]
   orch show <run-id> [<step-id>]
   orch runs
 
-Options for run:
+Options for plan and run:
   --mock               use the built-in mock models (no key, no network, no cost)
+  --plan-cap <usd>     most that drafting a tree may spend (default 0.10)
+  --out <file>         where to save a drafted tree (default plans/<goal>.tree.json)
+  --yes                run a drafted tree without asking first
   --concurrency <n>    steps running at once (default 4)
   --max-depth <n>      tree depth limit (default 4)
   --max-fan-out <n>    children per step limit (default 8)
@@ -46,6 +57,10 @@ type Flags = {
   "max-steps"?: string;
   db?: string;
   model?: string;
+  goal?: string;
+  out?: string;
+  "plan-cap"?: string;
+  yes?: boolean;
   "no-live"?: boolean;
   help?: boolean;
 };
@@ -185,27 +200,135 @@ function report(state: RunState) {
   }
 }
 
-async function cmdRun(args: string[], flags: Flags) {
-  const [treePath] = args;
-  if (!treePath || !flags.panel) throw new UsageError("run needs a tree file and --panel");
-  const tree = parseTree(readJson(treePath));
-  const panel = parsePanel(readJson(flags.panel));
-  const capNanos = money(flags.cap, "--cap");
-  const limits: Partial<Limits> = {};
+function limitsFrom(flags: Flags): Limits {
+  const limits: Limits = { ...DEFAULT_LIMITS };
   const depth = int(flags["max-depth"]);
   const fan = int(flags["max-fan-out"]);
   const steps = int(flags["max-steps"]);
   if (depth) limits.maxDepth = depth;
   if (fan) limits.maxFanOut = fan;
   if (steps) limits.maxSteps = steps;
+  return limits;
+}
 
+const DEFAULT_PLAN_CAP_USD = 0.1;
+
+// Ask the panel's plan role for a tree, print it with estimates, and save it
+// as an editable file.
+async function draftTree(goal: string, panel: Panel, limits: Limits, gateway: Gateway, planCap: number, out?: string) {
+  const width = process.stdout.columns || 120;
+  const color = process.stdout.isTTY === true;
+  const role = planRole(panel);
+  console.log(`Drafting with ${role.name} (${modelsOf(role.models)[0]})…`);
+  let result: PlanResult;
+  try {
+    result = await plan({ goal, panel, limits, gateway, capNanos: planCap });
+  } catch (err) {
+    if (err instanceof PlanError) {
+      for (const [i, a] of err.attempts.entries()) for (const p of a.problems) console.error(`  attempt ${i + 1}: ${p}`);
+    }
+    throw err;
+  }
+  const n = result.attempts.length;
+  console.log(`Drafted in ${n} attempt${n > 1 ? "s" : ""} for ${formatUsd(result.costNanos)}.`);
+  for (const r of result.repairs) console.log(`  repaired: ${r}`);
+  console.log("");
+  const estimate = await estimateTree(result.tree, panel, limits, (m) => gateway.price(m));
+  for (const line of renderPlan(result.tree, panel, estimate, { color, width })) console.log(line);
+  const path = out ?? freePath(`plans/${slugify(goal)}.tree.json`);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(treeToJson(result.tree), null, 2) + "\n");
+  console.log(`\nSaved to ${path}`);
+  return { result, estimate, path };
+}
+
+function slugify(goal: string): string {
+  return (
+    goal
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 6)
+      .join("-") || "plan"
+  );
+}
+
+function freePath(path: string): string {
+  if (!existsSync(path)) return path;
+  const base = path.replace(/\.tree\.json$/, "");
+  for (let i = 2; ; i++) if (!existsSync(`${base}-${i}.tree.json`)) return `${base}-${i}.tree.json`;
+}
+
+// A cap suggestion: the high estimate rounded up to a tidy amount.
+function suggestCap(highNanos: number): string {
+  const usd = highNanos / 1e9;
+  const steps = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50];
+  return (steps.find((s) => s >= usd) ?? Math.ceil(usd)).toFixed(2);
+}
+
+async function confirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question(`${question} [y/N] `);
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
+
+async function cmdPlan(args: string[], flags: Flags) {
+  const goal = args.join(" ").trim();
+  if (!goal || !flags.panel) throw new UsageError('plan needs a goal and --panel, e.g. orch plan "Compare..." --panel panels/starter.json');
+  const panel = parsePanel(readJson(flags.panel));
+  const limits = limitsFrom(flags);
   const gateway = gatewayFor(flags.mock ? "mock" : "openrouter");
+  const planCap = flags["plan-cap"] !== undefined ? money(flags["plan-cap"], "--plan-cap") : usdToNanos(DEFAULT_PLAN_CAP_USD);
+  const { estimate, path } = await draftTree(goal, panel, limits, gateway, planCap, flags.out);
+  console.log(`Edit it if you like, then run it with:`);
+  console.log(`  orch run ${path} --panel ${flags.panel} --cap ${suggestCap(estimate.total.high)}${flags.mock ? " --mock" : ""}`);
+}
+
+async function cmdRun(args: string[], flags: Flags) {
+  const [treePath] = args;
+  if (!flags.panel) throw new UsageError("run needs --panel");
+  if (!treePath && !flags.goal) throw new UsageError("run needs a tree file or --goal");
+  const panel = parsePanel(readJson(flags.panel));
+  const capNanos = money(flags.cap, "--cap");
+  const limits = limitsFrom(flags);
+  const gateway = gatewayFor(flags.mock ? "mock" : "openrouter");
+
+  let tree: Tree;
+  let drafted: Drafted | undefined;
+  if (flags.goal) {
+    if (treePath) throw new UsageError("pass either a tree file or --goal, not both");
+    const planCap = Math.min(capNanos, flags["plan-cap"] !== undefined ? money(flags["plan-cap"], "--plan-cap") : usdToNanos(DEFAULT_PLAN_CAP_USD));
+    const d = await draftTree(flags.goal, panel, limits, gateway, planCap, flags.out);
+    tree = d.result.tree;
+    drafted = { model: d.result.model, costNanos: d.result.costNanos, attempts: d.result.attempts.length, repairs: d.result.repairs };
+    if (d.estimate.total.high + d.result.costNanos > capNanos) {
+      console.log(`The high estimate is above the ${formatUsd(capNanos)} cap, so the run may pause before it finishes.`);
+    }
+    if (!flags.yes) {
+      if (!process.stdin.isTTY) throw new UsageError("pass --yes to run a drafted tree without confirming");
+      if (!(await confirm(`Run it with a ${formatUsd(capNanos)} cap?`))) {
+        console.log(`Not running. The tree is saved at ${d.path}.`);
+        return;
+      }
+    }
+  } else {
+    tree = parseTree(readJson(treePath!));
+    const estimate = await estimateTree(tree, panel, limits, (m) => gateway.price(m));
+    console.log(`Estimate ${formatUsd(estimate.total.low)}–${formatUsd(estimate.total.high)} against a ${formatUsd(capNanos)} cap.`);
+  }
+
   const store = await connect(flags);
   try {
     const engine = new Engine({ store, gateway });
     const opts: Parameters<Engine["createRun"]>[0] = { tree, panel, capNanos, limits };
     const concurrency = int(flags.concurrency);
     if (concurrency) opts.concurrency = concurrency;
+    if (drafted) opts.drafted = drafted;
     const runId = await engine.createRun(opts);
     await engine.start(runId);
     report(await driveWithUi(engine, runId, flags));
@@ -313,6 +436,10 @@ async function main() {
       "max-steps": { type: "string" },
       db: { type: "string" },
       model: { type: "string" },
+      goal: { type: "string" },
+      out: { type: "string" },
+      "plan-cap": { type: "string" },
+      yes: { type: "boolean", short: "y" },
       "no-live": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -324,6 +451,8 @@ async function main() {
     return;
   }
   switch (cmd) {
+    case "plan":
+      return cmdPlan(args, flags);
     case "run":
       return cmdRun(args, flags);
     case "resume":
