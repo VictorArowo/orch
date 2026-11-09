@@ -1,5 +1,5 @@
 // Start the engine service and the web app together. Arguments go to the
-// engine, so `pnpm dev --mock` runs everything on mock models.
+// engine, for example `pnpm dev --port 4400`.
 import { spawn, type ChildProcess } from "node:child_process";
 
 const engineArgs = process.argv.slice(2);

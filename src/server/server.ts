@@ -27,11 +27,8 @@ import { SavedTrees } from "./trees.ts";
 
 export interface ServeOptions {
   store: SqlStore;
-  // Mock models for everyone, or OpenRouter on each account's own key.
-  mode: "mock" | "openrouter";
-  mockGateway?: Gateway;
   // How to reach OpenRouter with a key that is decrypted only at call time.
-  // Tests swap this out.
+  // Tests swap this for a stand-in that never leaves the machine.
   openRouter?: (key: () => Promise<string>) => Gateway;
   master: MasterKeys;
   // The repo directory: panels/ and examples/ are read from here.
@@ -106,17 +103,16 @@ function money(v: unknown, name: string): number {
 }
 
 export async function serve(opts: ServeOptions): Promise<{ url: string; close(): Promise<void>; engine: Engine; accounts: AccountStore }> {
-  const { store, root, mode } = opts;
+  const { store, root } = opts;
+  // Every run calls real models on its owner's key.
+  const GATEWAY = "openrouter";
   const fetchFn = opts.fetch ?? fetch;
   const accounts = new AccountStore(store.sql, opts.master);
   await accounts.init();
   const trees = new SavedTrees(store.sql);
   await trees.init();
-  const mock = opts.mockGateway;
-  if (mode === "mock" && !mock) throw new Error("mock mode needs a mock gateway");
   const makeOpenRouter = opts.openRouter ?? ((key: () => Promise<string>) => new OpenRouterGateway(key));
   const gatewayFor = (owner: string | undefined): Gateway => {
-    if (mode === "mock") return mock!;
     return makeOpenRouter(async () => {
       const key = owner ? await accounts.useKey(owner, "openrouter") : undefined;
       if (!key) throw new GatewayError("no OpenRouter key is connected to this account; add one in Settings", false);
@@ -146,7 +142,7 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
   for (const r of await store.listRuns()) {
     const s = await engine.state(r.runId);
     const wasGoing = s.status === "running" || (s.status === "paused" && s.reason === SERVICE_STOPPED);
-    if (wasGoing && s.gateway === mode) {
+    if (wasGoing && s.gateway === GATEWAY) {
       await engine.resume(r.runId);
       drive(r.runId);
     }
@@ -179,7 +175,6 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
 
   // With real models, a user needs a key before anything can spend.
   const needKey = async (user: User) => {
-    if (mode !== "openrouter") return;
     const keys = await accounts.keys(user.id);
     if (!keys.some((k) => k.provider === "openrouter")) throw new HttpError(412, "connect an OpenRouter key in Settings first");
   };
@@ -193,7 +188,7 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
   // ---- Routes ----
 
   const open: [string, RegExp, PublicHandler][] = [
-    ["GET", /^\/api\/config$/, async () => ({ gateway: mode, limits: DEFAULT_LIMITS, planCapUsd: opts.planCapUsd ?? 0.1 })],
+    ["GET", /^\/api\/config$/, async () => ({ gateway: GATEWAY, limits: DEFAULT_LIMITS, planCapUsd: opts.planCapUsd ?? 0.1 })],
 
     [
       "POST",
@@ -242,7 +237,7 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
   ];
 
   const authed: [string, RegExp, Handler][] = [
-    ["GET", /^\/api\/me$/, async ({ user }) => ({ user, keys: await accounts.keys(user.id), gateway: mode })],
+    ["GET", /^\/api\/me$/, async ({ user }) => ({ user, keys: await accounts.keys(user.id), gateway: GATEWAY })],
 
     [
       "POST",
@@ -540,8 +535,8 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
         await ownRun(user, runId);
         await needKey(user);
         const s = await engine.state(runId);
-        if (s.gateway !== mode) {
-          throw new HttpError(409, `this run used ${s.gateway === "mock" ? "mock models" : s.gateway}, and the service is now on ${mode === "mock" ? "mock models" : mode}`);
+        if (s.gateway !== GATEWAY) {
+          throw new HttpError(409, `this run was made with ${s.gateway === "mock" ? "mock models" : s.gateway}, so it can't be resumed here`);
         }
         const resumeOpts: { capNanos?: number } = {};
         if (body.capUsd !== undefined) resumeOpts.capNanos = usdToNanos(money(body.capUsd, "the spending limit"));

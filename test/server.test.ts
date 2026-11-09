@@ -37,6 +37,12 @@ const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => 
   return new Response("not found", { status: 404 });
 }) as typeof fetch;
 
+// Stands in for OpenRouter, so no test reaches the network or spends money.
+const standIn = (): Gateway => {
+  const mock = new MockGateway({ latency: 5, checkReviseRate: 0, critiqueObjects: false });
+  return { name: "openrouter", price: (m) => mock.price(m), complete: (req, signal) => mock.complete(req, signal) };
+};
+
 async function start(extra: Partial<ServeOptions> = {}) {
   const root = mkdtempSync(join(tmpdir(), "orch-serve-"));
   cpSync("panels", join(root, "panels"), { recursive: true });
@@ -44,8 +50,7 @@ async function start(extra: Partial<ServeOptions> = {}) {
   store = await openStore("memory:");
   server = await serve({
     store,
-    mode: "mock",
-    mockGateway: new MockGateway({ latency: 5, checkReviseRate: 0, critiqueObjects: false }),
+    openRouter: standIn,
     master,
     root,
     port: 0,
@@ -85,10 +90,12 @@ function client() {
   return { call, cookie: () => cookie };
 }
 
-async function signedUp(email = `u${randomBytes(4).toString("hex")}@example.com`) {
+// A new account. Like a real user, it adds an OpenRouter key before running anything.
+async function signedUp(email = `u${randomBytes(4).toString("hex")}@example.com`, opts: { key?: boolean } = {}) {
   const c = client();
   const r = await c.call("/api/auth/signup", { email, name: "Ada", password: "correct horse battery" });
   expect(r.status).toBe(200);
+  if (opts.key !== false) expect((await c.call("/api/keys/openrouter", { key: GOOD_KEY })).status).toBe(200);
   return c;
 }
 
@@ -261,7 +268,6 @@ describe("runs belong to their account", () => {
     await start();
     const c = await signedUp("gone@example.com");
     const { runId } = (await c.call<{ runId: string }>("/api/runs", { tree: { goal: "g", root: {} }, panel: "starter", capUsd: 0.5 })).json;
-    await c.call("/api/keys/openrouter", { key: GOOD_KEY });
     expect((await c.call("/api/me/delete", { password: "wrong" })).status).toBe(403);
     expect((await c.call("/api/me/delete", { password: "correct horse battery" })).status).toBe(200);
     expect((await c.call("/api/me")).status).toBe(401);
@@ -288,8 +294,8 @@ describe("keys", () => {
   };
 
   it("checks a pasted key, stores it encrypted, and never shows it again", async () => {
-    await start({ mode: "openrouter", openRouter: recording });
-    const c = await signedUp();
+    await start({ openRouter: recording });
+    const c = await signedUp(undefined, { key: false });
     expect((await c.call("/api/keys/openrouter", { key: "not-a-key" })).status).toBe(400);
     expect((await c.call("/api/keys/openrouter", { key: `sk-or-v1-${"b".repeat(40)}` })).json).toMatchObject({ error: "OpenRouter didn't accept that key" });
 
@@ -308,8 +314,8 @@ describe("keys", () => {
 
   it("runs on the owner's own key, and needs one first", async () => {
     used.length = 0;
-    await start({ mode: "openrouter", openRouter: recording });
-    const c = await signedUp();
+    await start({ openRouter: recording });
+    const c = await signedUp(undefined, { key: false });
     const tree = { goal: "g", root: { role: "researcher" } };
     expect((await c.call("/api/runs", { tree, panel: "starter", capUsd: 0.5 })).status).toBe(412);
     expect((await c.call("/api/plan", { goal: "anything", panel: "starter" })).status).toBe(412);
@@ -328,8 +334,8 @@ describe("keys", () => {
   });
 
   it("connects through OpenRouter's OAuth flow", async () => {
-    await start({ mode: "openrouter", openRouter: recording });
-    const c = await signedUp();
+    await start({ openRouter: recording });
+    const c = await signedUp(undefined, { key: false });
     const { url } = (await c.call<{ url: string }>("/api/keys/openrouter/connect", { callbackUrl: "http://localhost:3000/settings/connected" })).json;
     const u = new URL(url);
     expect(u.origin + u.pathname).toBe("https://openrouter.ai/auth");

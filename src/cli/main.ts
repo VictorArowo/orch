@@ -558,7 +558,7 @@ async function cmdRuns(flags: Flags) {
 }
 
 async function cmdServe(flags: Flags) {
-  const mode = flags.mock ? "mock" : "openrouter";
+  if (flags.mock) throw new UsageError("the engine service only runs real models; use --mock with orch run instead");
   // Stored keys are encrypted with a master key kept outside the database.
   // Locally one is made in .orch/master.key if ORCH_MASTER_KEY isn't set.
   const generated = !process.env.ORCH_MASTER_KEY && !process.env.ORCH_MASTER_KEYS && !existsSync(".orch/master.key");
@@ -568,16 +568,14 @@ async function cmdServe(flags: Flags) {
   const planCapUsd = flags["plan-cap"] !== undefined ? money(flags["plan-cap"], "--plan-cap") / 1e9 : DEFAULT_PLAN_CAP_USD;
   const serveOpts: Parameters<typeof serve>[0] = {
     store,
-    mode,
     master,
     root: process.cwd(),
     port: int(flags.port) ?? 4317,
     planCapUsd,
     secureCookies: process.env.ORCH_SECURE_COOKIES === "1",
   };
-  if (mode === "mock") serveOpts.mockGateway = gatewayFor("mock");
   const server = await serve(serveOpts);
-  console.log(`orch engine on ${server.url}, ${mode === "mock" ? "on mock models" : "on each account's own OpenRouter key"}. Ctrl-C to stop.`);
+  console.log(`orch engine on ${server.url}. Runs use each account's own OpenRouter key. Ctrl-C to stop.`);
   await new Promise<void>((resolve) => process.once("SIGINT", () => resolve()));
   console.log("Stopping: pausing runs in progress…");
   await server.close();
