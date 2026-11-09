@@ -31,6 +31,18 @@ export interface Drafted {
   repairs: string[];
 }
 
+// What can change about a step once a run has started. null clears a field.
+export interface StepPatch {
+  title?: string;
+  instructions?: string;
+  role?: string | null;
+  model?: string | null;
+  check?: string | null;
+  critique?: string | null;
+  maxRetries?: number | null;
+  maxTokens?: number | null;
+}
+
 export type AttemptReason = "initial" | "check" | "critique" | "format" | "length" | "error" | "rerun";
 
 export type EventBody =
@@ -103,7 +115,15 @@ export type EventBody =
   | { type: "step.done"; stepId: string; attemptId: string; warning?: string }
   | { type: "step.failed"; stepId: string; error: string }
   | { type: "step.blocked"; stepId: string; neededNanos: Nanos; availableNanos: Nanos }
-  | { type: "step.rerun"; stepId: string; model?: string };
+  | { type: "step.rerun"; stepId: string; model?: string }
+  // Steering. Holding a step or a branch stops its work until it's released.
+  | { type: "step.held"; stepId: string }
+  | { type: "step.released"; stepId: string }
+  // An edit applies from the step's next attempt. `template` edits the
+  // template of a fan-out that hasn't made its branches yet.
+  | { type: "step.edited"; stepId: string; patch: StepPatch; template?: boolean }
+  // A skipped step counts as done with no output, so the steps after it go ahead.
+  | { type: "step.skipped"; stepId: string };
 
 export type EventType = EventBody["type"];
 

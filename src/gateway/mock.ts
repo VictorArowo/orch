@@ -79,7 +79,8 @@ export class MockGateway implements Gateway {
     if (latency > 0) await sleep(latency, signal);
     signal?.throwIfAborted();
 
-    let reply = await this.opts.respond?.(req, index);
+    // A reply that's slow to come is still cut short by the signal, as a real call would be.
+    let reply = await abortable(Promise.resolve(this.opts.respond?.(req, index)), signal);
     reply ??= this.defaultReply(req);
     const r = typeof reply === "string" ? { text: reply } : reply;
 
@@ -138,6 +139,25 @@ export class MockGateway implements Gateway {
     if (revised) lines.push(`- Revised to address the notes it was sent back with.`);
     return lines.join("\n");
   }
+}
+
+function abortable<T>(p: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return p;
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

@@ -1,10 +1,10 @@
-import type { AttemptReason, ChatMessage, Drafted, Purpose, RunEvent, Usage, Vote } from "./events.ts";
+import type { AttemptReason, ChatMessage, Drafted, Purpose, RunEvent, StepPatch, Usage, Vote } from "./events.ts";
 import type { Nanos } from "./money.ts";
 import type { Panel } from "./panel.ts";
 import type { Limits, StepSpec } from "./tree.ts";
 
 export type RunStatus = "ready" | "running" | "paused" | "done" | "stopped";
-export type StepStatus = "pending" | "running" | "blocked" | "done" | "failed";
+export type StepStatus = "pending" | "running" | "held" | "blocked" | "done" | "failed";
 
 export interface CallState {
   id: string;
@@ -68,6 +68,12 @@ export interface StepState {
   warning?: string;
   error?: string;
   blocked?: { neededNanos: Nanos; availableNanos: Nanos };
+  // Paused by the user, with everything under it.
+  held?: boolean;
+  // Counted as done with no output.
+  skipped?: boolean;
+  // How many times it has been edited mid-run.
+  edits?: number;
   // For parallel steps that fan out over another step's output.
   expanded: boolean;
 }
@@ -135,6 +141,16 @@ function addStep(state: RunState, spec: StepSpec, parentId: string | undefined, 
   state.steps[spec.id] = step;
   state.order.push(spec.id);
   for (const c of spec.children) addStep(state, c, spec.id, depth + 1);
+}
+
+// A copy of a spec with an edit applied; the original stays as logged.
+function patched(spec: StepSpec, patch: StepPatch): StepSpec {
+  const out: Record<string, unknown> = { ...spec };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null || v === undefined) delete out[k];
+    else out[k] = v;
+  }
+  return out as unknown as StepSpec;
 }
 
 function mustStep(state: RunState, id: string): StepState {
@@ -308,10 +324,37 @@ export function apply(state: RunState, e: RunEvent): RunState {
     case "step.blocked":
       mustStep(state, e.stepId).blocked = { neededNanos: e.neededNanos, availableNanos: e.availableNanos };
       break;
+    case "step.held":
+      mustStep(state, e.stepId).held = true;
+      break;
+    case "step.released":
+      delete mustStep(state, e.stepId).held;
+      break;
+    case "step.edited": {
+      const step = mustStep(state, e.stepId);
+      if (e.template) {
+        if (!step.spec.template) throw new Error(`"${e.stepId}" has no template`);
+        step.spec = { ...step.spec, template: patched(step.spec.template, e.patch) };
+      } else {
+        step.spec = patched(step.spec, e.patch);
+      }
+      step.edits = (step.edits ?? 0) + 1;
+      break;
+    }
+    case "step.skipped": {
+      const step = mustStep(state, e.stepId);
+      step.leafStatus = "done";
+      step.skipped = true;
+      delete step.acceptedAttemptId;
+      delete step.blocked;
+      delete step.error;
+      break;
+    }
     case "step.rerun": {
       const step = mustStep(state, e.stepId);
       step.epochStart = step.attemptIds.length;
       step.leafStatus = "pending";
+      delete step.skipped;
       delete step.acceptedAttemptId;
       delete step.warning;
       delete step.error;
@@ -344,19 +387,66 @@ export function epochAttempts(state: RunState, step: StepState): AttemptState[] 
   return step.attemptIds.slice(step.epochStart).map((a) => state.attempts[a]!);
 }
 
+// Held by the user, directly or through a box it sits in.
+export function isHeld(state: RunState, id: string): boolean {
+  for (let cur: StepState | undefined = state.steps[id]; cur; cur = cur.parentId !== undefined ? state.steps[cur.parentId] : undefined) {
+    if (cur.held) return true;
+  }
+  return false;
+}
+
 export function stepStatus(state: RunState, id: string): StepStatus {
   const step = state.steps[id]!;
   if (isLeaf(step)) {
-    if (step.blocked && (step.leafStatus === "pending" || step.leafStatus === "running")) return "blocked";
+    if (step.leafStatus === "pending" || step.leafStatus === "running") {
+      if (isHeld(state, id)) return "held";
+      if (step.blocked) return "blocked";
+    }
     return step.leafStatus;
   }
-  if (!step.expanded) return "pending";
+  if (!step.expanded) return isHeld(state, id) ? "held" : "pending";
   const kids = step.childIds.map((c) => stepStatus(state, c));
   if (kids.every((k) => k === "done")) return "done";
   if (kids.some((k) => k === "failed")) return "failed";
-  if (kids.some((k) => k === "running" || k === "done")) return "running";
+  if (kids.some((k) => k === "running")) return "running";
+  if (kids.some((k) => k === "held")) return "held";
+  if (kids.some((k) => k === "done")) return "running";
   if (kids.some((k) => k === "blocked")) return "blocked";
   return "pending";
+}
+
+// Leaves that read a step's output, directly or through other steps, so
+// would need re-running if it changed.
+export function dependentsOf(state: RunState, ids: string[]): string[] {
+  const changed = new Set<string>();
+  const addSubtree = (id: string) => {
+    changed.add(id);
+    for (const c of state.steps[id]?.childIds ?? []) addSubtree(c);
+  };
+  for (const id of ids) addSubtree(id);
+  // Boxes count as changed when anything inside them did.
+  const markAncestors = () => {
+    for (const id of [...changed]) {
+      for (let p = state.steps[id]?.parentId; p !== undefined; p = state.steps[p]?.parentId) changed.add(p);
+    }
+  };
+  markAncestors();
+  const out: string[] = [];
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const id of state.order) {
+      const step = state.steps[id]!;
+      if (!isLeaf(step) || changed.has(id)) continue;
+      if (inputIds(state, id).some((i) => changed.has(i))) {
+        changed.add(id);
+        out.push(id);
+        markAncestors();
+        grew = true;
+      }
+    }
+  }
+  return out;
 }
 
 // Steps whose output this step reads.

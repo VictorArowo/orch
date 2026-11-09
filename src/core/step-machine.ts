@@ -23,6 +23,7 @@ export const MAX_CALL_ERRORS = 3;
 export const MAX_LENGTH_RETRIES = 2;
 export const LENGTH_NOTE = "Your previous reply ran out of room before it finished. Write the complete reply again; you have more room this time.";
 export const INTERRUPTED = "interrupted";
+export const STOPPED = "stopped when the step was paused";
 
 export function doRoleFor(state: RunState, stepId: string): Role {
   const spec = state.steps[stepId]!.spec;
@@ -58,7 +59,7 @@ export function nextAction(state: RunState, stepId: string): StepAction {
   if (last.output === undefined) {
     const errors = last.callIds
       .map((c) => state.calls[c]!)
-      .filter((c) => c.purpose === "do" && c.status === "failed" && c.error !== INTERRUPTED);
+      .filter((c) => c.purpose === "do" && c.status === "failed" && c.error !== INTERRUPTED && c.error !== STOPPED);
     if (errors.length >= MAX_CALL_ERRORS) {
       return { kind: "fail", error: `model call failed ${errors.length} times: ${errors[errors.length - 1]!.error}` };
     }

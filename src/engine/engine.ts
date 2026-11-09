@@ -3,13 +3,15 @@ import { EventEmitter } from "node:events";
 import { hostname } from "node:os";
 import { decide, worstCase } from "../core/budget.ts";
 import { checkTree } from "../core/check-tree.ts";
-import type { ChatMessage, Drafted, EventBody, Purpose, RunEvent, Vote } from "../core/events.ts";
+import type { ChatMessage, Drafted, EventBody, Purpose, RunEvent, StepPatch, Vote } from "../core/events.ts";
 import { costOf, type Nanos } from "../core/money.ts";
-import { modelsOf, type Panel, type Role } from "../core/panel.ts";
+import { findRole, modelsOf, type Job as RoleJob, type Panel, type Role } from "../core/panel.ts";
 import { checkMessages, critiqueMessages, doMessages, parseList, parseObjections, parseVerdict, tally } from "../core/prompt.ts";
 import {
   blockers,
+  dependentsOf,
   emptyState,
+  isHeld,
   apply,
   epochAttempts,
   inputIds,
@@ -20,7 +22,7 @@ import {
   type AttemptState,
   type RunState,
 } from "../core/state.ts";
-import { INTERRUPTED, nextAction } from "../core/step-machine.ts";
+import { INTERRUPTED, nextAction, STOPPED } from "../core/step-machine.ts";
 import { DEFAULT_LIMITS, expandTemplate, walk, type Limits, type Tree } from "../core/tree.ts";
 import { GatewayError, type Gateway } from "../gateway/gateway.ts";
 import { redact } from "../gateway/redact.ts";
@@ -63,6 +65,9 @@ interface PlannedCall {
 }
 
 const DEFAULT_DO_TOKENS = 1024;
+// Why a run waits when the only work left is on steps the user paused.
+export const HELD_REASON = "waiting on steps you paused";
+const EDITABLE = ["title", "instructions", "role", "model", "check", "critique", "maxRetries", "maxTokens"] as const;
 const DEFAULT_REVIEW_TOKENS = 512;
 
 export function newWorkerId(): string {
@@ -100,6 +105,9 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
   private readonly cache = new Map<string, RunState>();
   private killed = false;
   private wake: (() => void)[] = [];
+  // The call each of this engine's jobs has under way, so pausing or skipping
+  // its step can stop it.
+  private inFlight = new Map<number, { runId: string; stepId: string; controller: AbortController }>();
 
   constructor(opts: EngineOptions) {
     super();
@@ -176,23 +184,115 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
 
   // Run a leaf again, optionally on another model. Steps that read its old
   // output become stale; they are left alone unless re-run too.
-  async rerun(runId: string, stepIds: string[], opts: { model?: string } = {}): Promise<void> {
-    if (opts.model) await this.gatewayFor((await this.refresh(runId)).owner).price(opts.model);
-    await this.locked(runId, (s) => {
-      const events: EventBody[] = [];
+  // Re-run steps, optionally on another model. A box re-runs every finished
+  // step inside it. With `cascade`, steps that read their output re-run too;
+  // otherwise those are left alone and show as stale.
+  async rerun(runId: string, stepIds: string[], opts: { model?: string; cascade?: boolean } = {}): Promise<string[]> {
+    const before = await this.refresh(runId);
+    if (opts.model) await this.gatewayFor(before.owner).price(opts.model);
+    const { result } = await this.locked<string[]>(runId, (s) => {
+      const targets: string[] = [];
+      const finished = (id: string) => ["done", "failed"].includes(s.steps[id]!.leafStatus);
+      const leavesUnder = (id: string): string[] => {
+        const step = s.steps[id]!;
+        return isLeaf(step) ? [id] : step.childIds.flatMap(leavesUnder);
+      };
       for (const id of stepIds) {
         const step = s.steps[id];
         if (!step) throw new Error(`no step "${id}" in run ${runId}`);
-        if (!isLeaf(step)) throw new Error(`"${id}" is a ${step.spec.mode} step; re-run its leaves instead`);
-        if (step.leafStatus !== "done" && step.leafStatus !== "failed") throw new Error(`"${id}" hasn't finished yet`);
-        const e: EventBody = { type: "step.rerun", stepId: id };
-        if (opts.model) e.model = opts.model;
-        events.push(e);
+        const leaves = leavesUnder(id).filter(finished);
+        if (isLeaf(step) && !finished(id)) throw new Error(`"${id}" hasn't finished yet`);
+        if (!leaves.length) throw new Error(`nothing in "${id}" has finished yet`);
+        targets.push(...leaves);
       }
+      if (opts.cascade) for (const d of dependentsOf(s, targets)) if (finished(d)) targets.push(d);
+      const unique = [...new Set(targets)];
+      const events: EventBody[] = unique.map((id) => {
+        const e: EventBody = { type: "step.rerun", stepId: id };
+        // A new model applies to the steps asked for, not to their dependents.
+        if (opts.model && stepIds.includes(id)) e.model = opts.model;
+        return e;
+      });
       if (s.status !== "running") events.push({ type: "run.resumed" });
+      return { events, result: unique };
+    });
+    await this.tick(runId);
+    return result!;
+  }
+
+  // Pause one step or a whole branch. Work it has under way stops now; a call
+  // cut short may still be billed, so it counts at its worst case.
+  async hold(runId: string, stepId: string): Promise<void> {
+    await this.locked(runId, (s) => {
+      const step = s.steps[stepId];
+      if (!step) throw new Error(`no step "${stepId}" in run ${runId}`);
+      if (step.held) return { events: [] };
+      if (stepStatus(s, stepId) === "done") throw new Error(`"${stepId}" has already finished`);
+      return { events: [{ type: "step.held", stepId }] };
+    });
+  }
+
+  async release(runId: string, stepId: string): Promise<void> {
+    await this.locked(runId, (s) => {
+      const step = s.steps[stepId];
+      if (!step) throw new Error(`no step "${stepId}" in run ${runId}`);
+      if (!step.held) return { events: [] };
+      const events: EventBody[] = [{ type: "step.released", stepId }];
+      if (s.status === "paused" && s.reason === HELD_REASON) events.push({ type: "run.resumed" });
       return { events };
     });
     await this.tick(runId);
+  }
+
+  // Count a step as done with no output, so the steps after it can go ahead.
+  // A run that stopped because this step failed carries on.
+  async skip(runId: string, stepId: string): Promise<void> {
+    await this.locked(runId, (s) => {
+      const step = s.steps[stepId];
+      if (!step) throw new Error(`no step "${stepId}" in run ${runId}`);
+      if (!isLeaf(step)) throw new Error(`"${stepId}" is a box; skip the steps inside it instead`);
+      if (step.leafStatus === "done") throw new Error(`"${stepId}" has already finished`);
+      const events: EventBody[] = [{ type: "step.skipped", stepId }];
+      if (step.held) events.unshift({ type: "step.released", stepId });
+      if (s.status === "stopped" || (s.status === "paused" && s.reason === HELD_REASON)) events.push({ type: "run.resumed" });
+      return { events };
+    });
+    await this.tick(runId);
+  }
+
+  // Change a step from its next attempt: its instructions, role, model or
+  // reviewers. `<fan-out>.template` edits a fan-out's template before it
+  // makes its branches.
+  async edit(runId: string, stepId: string, patch: StepPatch): Promise<void> {
+    const state = await this.refresh(runId);
+    const template = stepId.endsWith(".template") && !state.steps[stepId];
+    const id = template ? stepId.slice(0, -".template".length) : stepId;
+    const step = state.steps[id];
+    if (!step) throw new Error(`no step "${stepId}" in run ${runId}`);
+    if (template && (step.expanded || !step.spec.template)) throw new Error(`"${id}" has already made its branches; edit them instead`);
+    const allowed = isLeaf(step) || template ? EDITABLE : (["title"] as const);
+    for (const k of Object.keys(patch)) {
+      if (!(allowed as readonly string[]).includes(k)) throw new Error(`"${k}" can't be changed ${isLeaf(step) || template ? "once a run has started" : "on a box"}`);
+    }
+    const roleOf = (name: string, job: RoleJob) => {
+      const role = findRole(state.panel, name);
+      if (!role) throw new Error(`there's no role "${name}" in the ${state.panel.name} panel`);
+      if (role.job !== job) throw new Error(`"${name}" is a ${role.job} role, not a ${job} role`);
+      return role;
+    };
+    const gateway = this.gatewayFor(state.owner);
+    if (patch.role) roleOf(patch.role, "do");
+    if (patch.check) for (const m of modelsOf(roleOf(patch.check, "check").models)) await gateway.price(m);
+    if (patch.critique) for (const m of modelsOf(roleOf(patch.critique, "critique").models)) await gateway.price(m);
+    if (patch.model) await gateway.price(patch.model);
+    if (patch.title !== undefined && !patch.title.trim()) throw new Error("a step needs a title");
+    if (patch.maxRetries != null && (!Number.isInteger(patch.maxRetries) || patch.maxRetries < 0 || patch.maxRetries > 5)) throw new Error("send-backs must be 0 to 5");
+    if (patch.maxTokens != null && (!Number.isInteger(patch.maxTokens) || patch.maxTokens < 1 || patch.maxTokens > 64_000)) throw new Error("the token limit must be 1 to 64,000");
+    await this.locked(runId, () => {
+      const e: EventBody = { type: "step.edited", stepId: id, patch };
+      if (template) e.template = true;
+      return { events: [e] };
+    });
   }
 
   // Work on a run until it is done, paused or stopped. By default this engine
@@ -227,6 +327,11 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
       if (e.seq <= state.lastSeq) continue;
       apply(state, e);
       this.emit("event", e);
+      if (e.type === "step.held" || e.type === "step.skipped") {
+        for (const f of this.inFlight.values()) {
+          if (f.runId === runId && (isHeld(state, f.stepId) || state.steps[f.stepId]?.leafStatus === "done")) f.controller.abort();
+        }
+      }
     }
     return state;
   }
@@ -302,7 +407,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     const ready: string[] = [];
     for (const id of s.order) {
       const step = s.steps[id]!;
-      if (!isLeaf(step) || step.blocked || ctx.activeStepIds.has(id)) continue;
+      if (!isLeaf(step) || step.blocked || ctx.activeStepIds.has(id) || isHeld(s, id)) continue;
       if (step.leafStatus !== "pending" && step.leafStatus !== "running") continue;
       if (blockers(s, id).every((b) => stepStatus(s, b) === "done")) ready.push(id);
     }
@@ -318,6 +423,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
         events: [{ type: "run.paused", reason: "budget: the next call doesn't fit under the cap", neededNanos: needed }],
       };
     }
+    const held = Object.values(s.steps).filter((x) => x.held && stepStatus(s, x.id) === "held");
+    if (held.length) return { events: [{ type: "run.paused", reason: HELD_REASON }] };
     const failed = Object.values(s.steps).filter((x) => isLeaf(x) && x.leafStatus === "failed");
     const reason = failed.length
       ? `${failed.length} step${failed.length > 1 ? "s" : ""} failed: ${failed.map((f) => `${f.id} (${f.error})`).join("; ")}`
@@ -385,6 +492,11 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
         const state = await this.refresh(job.runId);
         if (state.status !== "running") {
           await this.store.finishJob(job.id, this.workerId, "cancelled");
+          return;
+        }
+        if (isHeld(state, job.stepId) || state.steps[job.stepId]!.leafStatus === "done") {
+          await this.store.finishJob(job.id, this.workerId, "cancelled");
+          await this.tick(job.runId);
           return;
         }
         const outcome = await this.step(job, state);
@@ -463,7 +575,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
         const a = action.attempt;
         const step = state.steps[stepId]!;
         const previous = epochAttempts(state, step).filter((x) => x.id !== a.id).pop();
-        const inputs = Object.keys(a.inputVersions).map((id) => ({
+        // A skipped step has nothing to pass on.
+        const inputs = Object.keys(a.inputVersions).filter((id) => !state.steps[id]!.skipped).map((id) => ({
           stepId: id,
           title: state.steps[id]!.spec.title,
           output: outputOf(state, id),
@@ -490,8 +603,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
             await this.locked(job.runId, () => ({ events: [{ type: "step.failed", stepId, error: r.error }] }), job);
             return "finished";
           }
-          const errors = a.callIds.length;
-          await sleep(this.retryBackoffMs * errors);
+          if (!r.stopped) await sleep(this.retryBackoffMs * a.callIds.length);
           return "continue";
         }
         const out: EventBody = { type: "attempt.output", attemptId: a.id, output: r.text };
@@ -522,6 +634,8 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
         }));
         const result = await this.callModels(job, a, calls);
         if (result.kind !== "done") return result.kind;
+        // A review cut short by a pause isn't a verdict; it runs again on resume.
+        if (result.results.some((r) => !r.ok && r.stopped)) return "continue";
         const votes: Vote[] = result.results.map((r, i) => {
           const model = calls[i]!.model;
           if (!r.ok) return { model, verdict: "abstain", notes: [`call failed: ${r.error}`] };
@@ -567,7 +681,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     calls: PlannedCall[],
   ): Promise<
     | { kind: "wait" | "blocked" }
-    | { kind: "done"; results: ({ ok: true; text: string; truncated: boolean } | { ok: false; error: string; retryable: boolean })[] }
+    | { kind: "done"; results: ({ ok: true; text: string; truncated: boolean } | { ok: false; error: string; retryable: boolean; stopped?: boolean })[] }
   > {
     const gateway = this.gatewayFor(this.cache.get(job.runId)!.owner);
     const prices = await Promise.all(calls.map((c) => gateway.price(c.model)));
@@ -607,17 +721,22 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     );
     if (decision !== "ok") return { kind: decision! };
 
+    const controller = new AbortController();
+    this.inFlight.set(job.id, { runId: job.runId, stepId: job.stepId, controller });
     const settled = await Promise.all(
       calls.map(async (c, i) => {
         const started = Date.now();
         try {
-          const res = await gateway.complete({
+          const res = await gateway.complete(
+            {
             model: c.model,
             messages: c.messages,
             maxTokens: c.maxTokens,
             settings: c.role.settings,
             meta: { purpose: c.purpose, stepId: job.stepId, output: this.cache.get(job.runId)!.steps[job.stepId]!.spec.output },
-          });
+            },
+            controller.signal,
+          );
           const event: EventBody = {
             type: "call.finished",
             callId: callIds[i]!,
@@ -630,6 +749,12 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
           return { event, result: { ok: true as const, text: res.text, truncated: res.truncated === true } };
         } catch (err) {
           if (err instanceof Killed) throw err;
+          // Stopped because the step was paused or skipped. It may still
+          // have been billed, so it counts at its worst case.
+          if (controller.signal.aborted) {
+            const event: EventBody = { type: "call.failed", callId: callIds[i]!, error: STOPPED, costNanos: amounts[i]!, costKnown: false };
+            return { event, result: { ok: false as const, error: STOPPED, retryable: true, stopped: true } };
+          }
           const error = redact(err instanceof Error ? err.message : String(err));
           const retryable = err instanceof GatewayError ? err.retryable : true;
           const event: EventBody = { type: "call.failed", callId: callIds[i]!, error, costNanos: 0, costKnown: true };
@@ -637,6 +762,7 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
         }
       }),
     );
+    this.inFlight.delete(job.id);
     await this.locked(job.runId, () => ({ events: settled.map((x) => x.event) }), job);
     return { kind: "done", results: settled.map((x) => x.result) };
   }

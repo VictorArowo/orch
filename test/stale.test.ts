@@ -52,11 +52,30 @@ describe("re-runs and stale outputs", () => {
     await h.close();
   });
 
-  it("refuses to re-run a composite step or one still running", async () => {
+  it("re-runs every step in a box, and refuses steps that don't exist", async () => {
     const h = await harness();
     const first = await h.run(t());
-    await expect(h.engine.rerun(first.runId, ["research"])).rejects.toThrow(/re-run its leaves/);
+    const rerun = await h.engine.rerun(first.runId, ["research"]);
+    expect(rerun).toEqual(["research.1", "research.2"]);
+    const state = await h.engine.drive(first.runId);
+    expect(state.steps["research.1"]!.attemptIds).toHaveLength(2);
     await expect(h.engine.rerun(first.runId, ["nope"])).rejects.toThrow(/no step/);
+    await h.close();
+  });
+
+  it("re-runs the steps that read a re-run step's output, so nothing is left stale", async () => {
+    const h = await harness();
+    const first = await h.run(t());
+    const rerun = await h.engine.rerun(first.runId, ["research.2"], { cascade: true });
+    expect(rerun).toEqual(["research.2", "compare", "write"]);
+    const state = await h.engine.drive(first.runId);
+    expect(state.order.filter((id) => isStale(state, id))).toEqual([]);
+    expect(state.steps["research.1"]!.attemptIds).toHaveLength(1);
+    // Each dependent ran only after what it reads was done again.
+    const startOf = (id: string) => h.events.findIndex((e) => e.type === "attempt.started" && e.attemptId === `${id}#2`);
+    const doneOf = (id: string) => h.events.findIndex((e, i) => i > startOf(id) && e.type === "step.done" && e.stepId === id);
+    expect(startOf("compare")).toBeGreaterThan(doneOf("research.2"));
+    expect(startOf("write")).toBeGreaterThan(doneOf("compare"));
     await h.close();
   });
 });
