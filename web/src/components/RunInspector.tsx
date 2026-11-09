@@ -5,6 +5,7 @@ import { formatUsd } from "orch/src/core/money.ts";
 import { isLeaf, isStale, outputOf, stepCost, stepStatus, type AttemptState, type RunState } from "orch/src/core/state.ts";
 import { useState } from "react";
 import { Markdown } from "./Markdown";
+import { StepControls } from "./StepControls";
 import { shortModel, Status } from "./ui";
 
 const REASON: Record<AttemptReason, string> = {
@@ -131,8 +132,23 @@ function Attempt({ state, attempt }: { state: RunState; attempt: AttemptState })
 }
 
 export function RunInspector({ state, selected }: { state: RunState; selected?: string | undefined; version: number }) {
-  const id = selected?.endsWith(".template") ? undefined : selected;
+  const isTemplate = !!selected?.endsWith(".template") && !state.steps[selected];
+  const id = isTemplate ? undefined : selected;
   const step = id ? state.steps[id] : undefined;
+
+  if (isTemplate && selected) {
+    const owner = state.steps[selected.slice(0, -".template".length)];
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-[19px] font-bold leading-tight tracking-[-0.01em]">{owner?.spec.template?.title}</h2>
+          <div className="mt-0.5 text-[12px] text-graphite">{selected}</div>
+        </div>
+        {owner?.spec.template?.instructions && <p className="text-[14px] leading-relaxed text-ink-soft">{owner.spec.template.instructions}</p>}
+        <StepControls key={selected} state={state} id={selected} />
+      </div>
+    );
+  }
 
   if (!step) {
     return (
@@ -169,6 +185,9 @@ export function RunInspector({ state, selected }: { state: RunState; selected?: 
       {step.spec.instructions && <p className="text-[14px] leading-relaxed text-ink-soft">{step.spec.instructions}</p>}
       {step.warning && <p className="note text-[13px] text-red">{step.warning}</p>}
       {step.error && <p className="note text-[13px] text-red">{step.error}</p>}
+      {step.skipped && <p className="note text-[13px] text-graphite">Skipped: the steps after it got no output from it.</p>}
+      {(step.edits ?? 0) > 0 && <p className="note text-[13px] text-blue">Edited during the run.</p>}
+      <StepControls key={step.id} state={state} id={step.id} />
       {isLeaf(step) ? (
         attempts.length ? (
           attempts.map((a) => <Attempt key={a.id} state={state} attempt={a} />)

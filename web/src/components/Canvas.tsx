@@ -19,7 +19,7 @@ import { edgesOf, type ViewNode } from "orch/src/view/view.ts";
 import { useEffect, useMemo, useRef } from "react";
 
 export type Tone = "role" | "dim" | "faint" | "run" | "done" | "fail" | "blocked" | "stale" | "ink";
-export type CardStatus = "idle" | "pending" | "running" | "blocked" | "done" | "failed";
+export type CardStatus = "idle" | "pending" | "running" | "held" | "skipped" | "blocked" | "done" | "failed";
 
 export interface CardInfo {
   title: string;
@@ -52,6 +52,8 @@ const TONE: Record<Tone, string> = {
 const SHEET: Record<CardStatus, string> = {
   idle: "bg-sheet border-ink/25",
   pending: "bg-paper border-dashed border-graphite-light",
+  held: "bg-sheet border-dashed border-blue border-[1.5px]",
+  skipped: "bg-paper border-dashed border-graphite-light",
   running: "highlighting border-ink",
   blocked: "bg-sheet border-dashed border-red",
   done: "bg-sheet border-ink border-[1.5px]",
@@ -61,6 +63,8 @@ const SHEET: Record<CardStatus, string> = {
 const TITLE: Record<CardStatus, string> = {
   idle: "text-ink",
   pending: "text-graphite",
+  held: "text-ink",
+  skipped: "text-graphite line-through decoration-graphite-light",
   running: "text-ink",
   blocked: "text-ink",
   done: "text-ink",
@@ -71,6 +75,7 @@ const MARK: Partial<Record<CardStatus, [string, string]>> = {
   done: ["✓", "text-ink"],
   failed: ["✗", "text-red"],
   blocked: ["$", "text-red"],
+  held: ["‖", "text-blue font-bold"],
   running: ["●", "text-ink animate-pulse"],
 };
 
@@ -148,7 +153,16 @@ function BoxNode({ data }: NodeProps<Node<Data>>) {
   const info = data.info;
   const status = info?.status ?? "idle";
   const together = info?.mode?.startsWith("together") || info?.mode?.startsWith("for each");
-  const color = status === "running" ? "border-highlight-deep" : status === "pending" ? "border-graphite-light" : status === "failed" ? "border-red" : "border-ink";
+  const color =
+    status === "running"
+      ? "border-highlight-deep"
+      : status === "held"
+        ? "border-blue"
+        : status === "pending"
+          ? "border-graphite-light"
+          : status === "failed"
+            ? "border-red"
+            : "border-ink";
   return (
     <div style={{ width: data.w, height: data.h }} className={`relative rounded-[6px] ${data.selected ? selectedRing : ""}`}>
       <div className="flex h-[34px] items-baseline gap-2 pl-4 pr-1 pt-2">

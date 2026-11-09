@@ -2,7 +2,7 @@
 
 import type { RunEvent } from "orch/src/core/events.ts";
 import { formatUsd } from "orch/src/core/money.ts";
-import { apply, emptyState, isLeaf, isStale, stepCost, stepStatus, type RunState, type StepState } from "orch/src/core/state.ts";
+import { apply, emptyState, isLeaf, isStale, stepCost, stepStatus, treeOrder, type RunState, type StepState } from "orch/src/core/state.ts";
 import { viewOfRun, type ViewNode } from "orch/src/view/view.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, type CardInfo, type CardStatus } from "./Canvas";
@@ -30,7 +30,7 @@ function modelsUsed(state: RunState, step: StepState): string[] {
 }
 
 function leafCard(state: RunState, step: StepState, started: Map<string, string>, now: number): CardInfo {
-  const status = stepStatus(state, step.id) as CardStatus;
+  const status: CardStatus = step.skipped ? "skipped" : (stepStatus(state, step.id) as CardStatus);
   const attempts = step.attemptIds.map((a) => state.attempts[a]!);
   const last = attempts[attempts.length - 1];
   const role = last?.role ?? step.spec.role ?? state.panel.roles.find((r) => r.job === "do")?.name ?? "";
@@ -46,7 +46,10 @@ function leafCard(state: RunState, step: StepState, started: Map<string, string>
     const revise = r.votes.filter((v) => v.verdict === "revise").length;
     if (r.votes.length > 1 && revise && revise < r.votes.length) tags.push({ text: `jury split ${r.votes.length - revise}-${revise}`, tone: "faint" });
   }
-  if (step.warning) tags.push({ text: "check unresolved", tone: "run" });
+  if (step.skipped) tags.push({ text: "skipped", tone: "faint" });
+  if (status === "held") tags.push({ text: "paused", tone: "role" });
+  if ((step.edits ?? 0) > 0) tags.push({ text: "edited", tone: "role" });
+  if (step.warning) tags.push({ text: step.warning.includes("cut off") ? "cut off" : "check unresolved", tone: "fail" });
   if (step.blocked) tags.push({ text: `needs ${formatUsd(step.blocked.neededNanos)}`, tone: "blocked" });
   if (status === "done" && isStale(state, step.id)) tags.push({ text: "stale", tone: "stale" });
   if (step.error) tags.push({ text: step.error, tone: "fail" });
@@ -159,6 +162,23 @@ export function RunView({ runId }: { runId: string }) {
     return ids;
   }, [version]);
 
+  const stale = useMemo(
+    () => treeOrder(state).filter((id) => isLeaf(state.steps[id]!) && stepStatus(state, id) === "done" && isStale(state, id)),
+    [version],
+  );
+
+  async function rerunStale() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await post(`/api/runs/${runId}/rerun`, { stepIds: stale, cascade: true });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function control(action: "pause" | "resume") {
     setBusy(true);
     setError(undefined);
@@ -222,6 +242,16 @@ export function RunView({ runId }: { runId: string }) {
             )}
           </div>
         </div>
+        {stale.length > 0 && state.status !== "running" && (
+          <div className="flex flex-wrap items-center gap-3 text-[13px]">
+            <span className="note text-blue">
+              {stale.length === 1 ? "1 step reads" : `${stale.length} steps read`} output that has changed since it ran ({stale.map((id) => state.steps[id]!.spec.title).join(", ")}).
+            </span>
+            <Button disabled={busy} onClick={() => void rerunStale()}>
+              Re-run {stale.length === 1 ? "it" : "them"}
+            </Button>
+          </div>
+        )}
         {(state.reason || error) && (
           <div className="flex flex-col gap-1.5 text-[13px]">
             {state.reason && (

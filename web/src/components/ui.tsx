@@ -35,6 +35,7 @@ const STATUS_WORD: Record<string, [string, string]> = {
   stopped: ["Stopped", "text-red"],
   pending: ["Not started", "text-graphite"],
   blocked: ["Waiting on budget", "text-red"],
+  held: ["Paused", "text-blue"],
   failed: ["Failed", "text-red"],
 };
 
