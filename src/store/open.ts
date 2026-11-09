@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
-import { SqlStore, type SqlClient, type SqlDb } from "./sql-store.js";
-import type { Store } from "./store.js";
+import { SqlStore, type SqlClient, type SqlDb } from "./sql-store.ts";
+import type { Store } from "./store.ts";
 
 function pgliteDb(db: PGlite): SqlDb {
   return {

@@ -1,5 +1,5 @@
-import type { EventBody, RunEvent } from "../core/events.js";
-import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type RunSummary, type Store } from "./store.js";
+import type { EventBody, RunEvent } from "../core/events.ts";
+import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type RunSummary, type Store } from "./store.ts";
 
 // A minimal SQL surface that both node-postgres and PGlite can provide, so the
 // same queries run against a real server and the embedded database.

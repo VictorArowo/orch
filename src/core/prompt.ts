@@ -1,6 +1,6 @@
-import type { ChatMessage, Vote } from "./events.js";
-import type { Role } from "./panel.js";
-import type { StepSpec } from "./tree.js";
+import type { ChatMessage, Vote } from "./events.ts";
+import type { Role } from "./panel.ts";
+import type { StepSpec } from "./tree.ts";
 
 // Each step sees only its own instructions and inputs, never the run's history.
 

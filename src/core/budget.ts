@@ -1,5 +1,5 @@
-import type { ChatMessage } from "./events.js";
-import type { Nanos, Price } from "./money.js";
+import type { ChatMessage } from "./events.ts";
+import type { Nanos, Price } from "./money.ts";
 
 // Before a call we don't know how many tokens the prompt is, only its text.
 // Byte-level BPE tokenizers never produce more tokens than the text has UTF-8

@@ -1,8 +1,8 @@
-import type { TreeEstimate } from "../core/estimate.js";
-import { formatUsd } from "../core/money.js";
-import { defaultDoRole, findRole, modelsOf, type Panel } from "../core/panel.js";
-import type { StepSpec, Tree } from "../core/tree.js";
-import { isLeaf, isStale, stepCost, stepStatus, treeOrder, type RunState, type StepState, type StepStatus } from "../core/state.js";
+import type { TreeEstimate } from "../core/estimate.ts";
+import { formatUsd } from "../core/money.ts";
+import { defaultDoRole, findRole, modelsOf, type Panel } from "../core/panel.ts";
+import type { StepSpec, Tree } from "../core/tree.ts";
+import { isLeaf, isStale, stepCost, stepStatus, treeOrder, type RunState, type StepState, type StepStatus } from "../core/state.ts";
 
 export interface RenderOptions {
   color: boolean;

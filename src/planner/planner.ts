@@ -1,14 +1,14 @@
-import { worstCase } from "../core/budget.js";
-import { checkTree } from "../core/check-tree.js";
-import type { ChatMessage, Usage } from "../core/events.js";
-import { costOf, formatUsd, type Nanos } from "../core/money.js";
-import { modelsOf, PanelError, type Panel, type Role } from "../core/panel.js";
-import { extractJson } from "../core/prompt.js";
-import { parseTree, type Limits, type Tree } from "../core/tree.js";
-import { GatewayError, type Gateway } from "../gateway/gateway.js";
-import { redact } from "../gateway/redact.js";
-import { planMessages, retryMessage } from "./prompt.js";
-import { repairPlan } from "./repair.js";
+import { worstCase } from "../core/budget.ts";
+import { checkTree } from "../core/check-tree.ts";
+import type { ChatMessage, Usage } from "../core/events.ts";
+import { costOf, formatUsd, type Nanos } from "../core/money.ts";
+import { modelsOf, PanelError, type Panel, type Role } from "../core/panel.ts";
+import { extractJson } from "../core/prompt.ts";
+import { parseTree, type Limits, type Tree } from "../core/tree.ts";
+import { GatewayError, type Gateway } from "../gateway/gateway.ts";
+import { redact } from "../gateway/redact.ts";
+import { planMessages, retryMessage } from "./prompt.ts";
+import { repairPlan } from "./repair.ts";
 
 export interface PlanOptions {
   goal: string;

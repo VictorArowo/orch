@@ -1,6 +1,6 @@
-import { costOf, priceFromUsdPerToken, type Price } from "../core/money.js";
-import type { CompletionRequest, CompletionResult, Gateway } from "./gateway.js";
-import { mockListLength, mockPlan } from "./mock-plan.js";
+import { costOf, priceFromUsdPerToken, type Price } from "../core/money.ts";
+import type { CompletionRequest, CompletionResult, Gateway } from "./gateway.ts";
+import { mockListLength, mockPlan } from "./mock-plan.ts";
 
 // A deterministic stand-in for a real gateway: no key, no network. Replies are
 // derived from a hash of the request, so the same tree gives the same run.

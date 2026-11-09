@@ -1,12 +1,12 @@
-import type { RunEvent } from "../src/core/events.js";
-import { usdToNanos } from "../src/core/money.js";
-import { parsePanel, type Panel } from "../src/core/panel.js";
-import type { RunState } from "../src/core/state.js";
-import { parseTree, type Limits, type Tree } from "../src/core/tree.js";
-import { Engine, type EngineOptions } from "../src/engine/engine.js";
-import { MockGateway, type MockOptions } from "../src/gateway/mock.js";
-import { openStore } from "../src/store/open.js";
-import type { Store } from "../src/store/store.js";
+import type { RunEvent } from "../src/core/events.ts";
+import { usdToNanos } from "../src/core/money.ts";
+import { parsePanel, type Panel } from "../src/core/panel.ts";
+import type { RunState } from "../src/core/state.ts";
+import { parseTree, type Limits, type Tree } from "../src/core/tree.ts";
+import { Engine, type EngineOptions } from "../src/engine/engine.ts";
+import { MockGateway, type MockOptions } from "../src/gateway/mock.ts";
+import { openStore } from "../src/store/open.ts";
+import type { Store } from "../src/store/store.ts";
 
 export const panel: Panel = parsePanel({
   name: "test",

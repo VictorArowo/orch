@@ -2,11 +2,11 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { usdToNanos } from "../src/core/money.js";
-import { Engine } from "../src/engine/engine.js";
-import { MockGateway } from "../src/gateway/mock.js";
-import { openStore } from "../src/store/open.js";
-import { deferred, panel, tree } from "./helpers.js";
+import { usdToNanos } from "../src/core/money.ts";
+import { Engine } from "../src/engine/engine.ts";
+import { MockGateway } from "../src/gateway/mock.ts";
+import { openStore } from "../src/store/open.ts";
+import { deferred, panel, tree } from "./helpers.ts";
 
 const t = () =>
   tree({

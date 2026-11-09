@@ -1,6 +1,6 @@
-import type { ChatMessage } from "../core/events.js";
-import type { Panel, Role } from "../core/panel.js";
-import type { Limits } from "../core/tree.js";
+import type { ChatMessage } from "../core/events.ts";
+import type { Panel, Role } from "../core/panel.ts";
+import type { Limits } from "../core/tree.ts";
 
 // The planner sees the goal, the roles it may assign, the limits and the tree
 // format with one worked example. Nothing else.

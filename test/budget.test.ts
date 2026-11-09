@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { decide, promptTokensUpperBound, worstCase } from "../src/core/budget.js";
-import { costOf, formatUsd, type Price } from "../src/core/money.js";
-import { apply, emptyState } from "../src/core/state.js";
-import { harness, tree } from "./helpers.js";
+import { decide, promptTokensUpperBound, worstCase } from "../src/core/budget.ts";
+import { costOf, formatUsd, type Price } from "../src/core/money.ts";
+import { apply, emptyState } from "../src/core/state.ts";
+import { harness, tree } from "./helpers.ts";
 
 // Simple prices in nanodollars per token: prompts are free and each
 // completion token costs 1000, so a 100-token call reserves exactly 100,000.

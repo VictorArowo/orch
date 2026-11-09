@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { usdToNanos } from "../src/core/money.js";
-import { redact } from "../src/gateway/redact.js";
-import { openStore } from "../src/store/open.js";
-import { LostLeaseError } from "../src/store/store.js";
-import { panel, tree } from "./helpers.js";
+import { usdToNanos } from "../src/core/money.ts";
+import { redact } from "../src/gateway/redact.ts";
+import { openStore } from "../src/store/open.ts";
+import { LostLeaseError } from "../src/store/store.ts";
+import { panel, tree } from "./helpers.ts";
 
 // Runs against the embedded database, and against a real Postgres too when
 // ORCH_TEST_DATABASE_URL is set (for example after `pnpm db:up`).

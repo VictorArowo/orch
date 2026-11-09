@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parsePanel } from "../src/core/panel.js";
-import { DEFAULT_LIMITS, expandTemplate, parseTree, validateTree } from "../src/core/tree.js";
-import { harness, panel, tree } from "./helpers.js";
+import { parsePanel } from "../src/core/panel.ts";
+import { DEFAULT_LIMITS, expandTemplate, parseTree, validateTree } from "../src/core/tree.ts";
+import { harness, panel, tree } from "./helpers.ts";
 
 describe("tree format", () => {
   it("parses the example tree and starter panel", () => {

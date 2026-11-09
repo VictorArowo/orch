@@ -1,7 +1,7 @@
-import type { AttemptReason, ChatMessage, Drafted, Purpose, RunEvent, Usage, Vote } from "./events.js";
-import type { Nanos } from "./money.js";
-import type { Panel } from "./panel.js";
-import type { Limits, StepSpec } from "./tree.js";
+import type { AttemptReason, ChatMessage, Drafted, Purpose, RunEvent, Usage, Vote } from "./events.ts";
+import type { Nanos } from "./money.ts";
+import type { Panel } from "./panel.ts";
+import type { Limits, StepSpec } from "./tree.ts";
 
 export type RunStatus = "ready" | "running" | "paused" | "done" | "stopped";
 export type StepStatus = "pending" | "running" | "blocked" | "done" | "failed";

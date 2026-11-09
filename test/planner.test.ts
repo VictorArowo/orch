@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkTree, treeToJson } from "../src/core/check-tree.js";
-import { usdToNanos } from "../src/core/money.js";
-import { parsePanel } from "../src/core/panel.js";
-import { DEFAULT_LIMITS, parseTree } from "../src/core/tree.js";
-import { GatewayError } from "../src/gateway/gateway.js";
-import { MockGateway } from "../src/gateway/mock.js";
-import { plan, PlanError } from "../src/planner/planner.js";
-import { repairPlan } from "../src/planner/repair.js";
-import { harness, panel, tree } from "./helpers.js";
+import { checkTree, treeToJson } from "../src/core/check-tree.ts";
+import { usdToNanos } from "../src/core/money.ts";
+import { parsePanel } from "../src/core/panel.ts";
+import { DEFAULT_LIMITS, parseTree } from "../src/core/tree.ts";
+import { GatewayError } from "../src/gateway/gateway.ts";
+import { MockGateway } from "../src/gateway/mock.ts";
+import { plan, PlanError } from "../src/planner/planner.ts";
+import { repairPlan } from "../src/planner/repair.ts";
+import { harness, panel, tree } from "./helpers.ts";
 
 const starter = parsePanel(JSON.parse(readFileSync("panels/starter.json", "utf8")));
 const goals = JSON.parse(readFileSync("examples/goals.json", "utf8")) as { id: string; goal: string; maxSteps: number }[];

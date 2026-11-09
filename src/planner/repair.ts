@@ -1,5 +1,5 @@
-import { findRole, type Job, type Panel } from "../core/panel.js";
-import type { Limits } from "../core/tree.js";
+import { findRole, type Job, type Panel } from "../core/panel.ts";
+import type { Limits } from "../core/tree.ts";
 
 // Cheap, safe fixes for common slips in a model's plan, applied before
 // validation. Anything that would change what the plan means (too deep, too

@@ -1,6 +1,6 @@
-import type { AttemptReason } from "./events.js";
-import { defaultDoRole, findRole, ladderModel, type Role } from "./panel.js";
-import { epochAttempts, type AttemptState, type RunState } from "./state.js";
+import type { AttemptReason } from "./events.ts";
+import { defaultDoRole, findRole, ladderModel, type Role } from "./panel.ts";
+import { epochAttempts, type AttemptState, type RunState } from "./state.ts";
 
 // What a leaf step should do next, worked out from the event log alone. The
 // engine runs one action, records the result as events, and asks again. That

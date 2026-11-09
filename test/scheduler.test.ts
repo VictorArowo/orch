@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { outputOf, versionOf } from "../src/core/state.js";
-import { usdToNanos } from "../src/core/money.js";
-import { Engine } from "../src/engine/engine.js";
-import { MockGateway } from "../src/gateway/mock.js";
-import { harness, lastUser, panel, tree } from "./helpers.js";
+import { outputOf, versionOf } from "../src/core/state.ts";
+import { usdToNanos } from "../src/core/money.ts";
+import { Engine } from "../src/engine/engine.ts";
+import { MockGateway } from "../src/gateway/mock.ts";
+import { harness, lastUser, panel, tree } from "./helpers.ts";
 
 describe("scheduler", () => {
   it("runs parallel steps at once, up to the concurrency limit", async () => {

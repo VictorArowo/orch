@@ -1,6 +1,6 @@
-import { priceFromUsdPerToken, usdToNanos, type Price } from "../core/money.js";
-import { GatewayError, type CompletionRequest, type CompletionResult, type Gateway } from "./gateway.js";
-import { redact } from "./redact.js";
+import { priceFromUsdPerToken, usdToNanos, type Price } from "../core/money.ts";
+import { GatewayError, type CompletionRequest, type CompletionResult, type Gateway } from "./gateway.ts";
+import { redact } from "./redact.ts";
 
 const BASE = "https://openrouter.ai/api/v1";
 const TIMEOUT_MS = 180_000;

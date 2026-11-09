@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isStale, outputOf } from "../src/core/state.js";
-import { harness, tree } from "./helpers.js";
+import { isStale, outputOf } from "../src/core/state.ts";
+import { harness, tree } from "./helpers.ts";
 
 const t = () =>
   tree({

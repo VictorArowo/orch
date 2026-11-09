@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GatewayError } from "../src/gateway/gateway.js";
-import { harness, lastUser, tree } from "./helpers.js";
+import { GatewayError } from "../src/gateway/gateway.ts";
+import { harness, lastUser, tree } from "./helpers.ts";
 
 const verdict = (v: "pass" | "revise", notes: string[] = []) => JSON.stringify({ verdict: v, notes });
 

@@ -1,6 +1,6 @@
-import type { Panel } from "./panel.js";
-import { apply, emptyState, findCycle } from "./state.js";
-import { TreeError, validateTree, type Limits, type StepSpec, type Tree } from "./tree.js";
+import type { Panel } from "./panel.ts";
+import { apply, emptyState, findCycle } from "./state.ts";
+import { TreeError, validateTree, type Limits, type StepSpec, type Tree } from "./tree.ts";
 
 // Everything a tree must pass before it can run: the schema-level checks in
 // validateTree, plus a check that no step ends up waiting on itself.

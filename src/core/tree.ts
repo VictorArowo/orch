@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findRole, modelsOf, type Job, type Panel } from "./panel.js";
+import { findRole, modelsOf, type Job, type Panel } from "./panel.ts";
 
 // The tree format. Hand-written trees and (from milestone 2) the planner both
 // produce this shape: a goal and a root step.

@@ -6,15 +6,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { treeToJson } from "../src/core/check-tree.js";
-import { estimateTree } from "../src/core/estimate.js";
-import { formatUsd, usdToNanos } from "../src/core/money.js";
-import { parsePanel } from "../src/core/panel.js";
-import { DEFAULT_LIMITS, walk, type StepSpec } from "../src/core/tree.js";
-import type { Gateway } from "../src/gateway/gateway.js";
-import { MockGateway } from "../src/gateway/mock.js";
-import { OpenRouterGateway } from "../src/gateway/openrouter.js";
-import { plan, PlanError } from "../src/planner/planner.js";
+import { treeToJson } from "../src/core/check-tree.ts";
+import { estimateTree } from "../src/core/estimate.ts";
+import { formatUsd, usdToNanos } from "../src/core/money.ts";
+import { parsePanel } from "../src/core/panel.ts";
+import { DEFAULT_LIMITS, walk, type StepSpec } from "../src/core/tree.ts";
+import type { Gateway } from "../src/gateway/gateway.ts";
+import { MockGateway } from "../src/gateway/mock.ts";
+import { OpenRouterGateway } from "../src/gateway/openrouter.ts";
+import { plan, PlanError } from "../src/planner/planner.ts";
 
 interface Goal {
   id: string;

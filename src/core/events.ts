@@ -1,6 +1,6 @@
-import type { Nanos } from "./money.js";
-import type { Panel } from "./panel.js";
-import type { Limits, StepSpec } from "./tree.js";
+import type { Nanos } from "./money.ts";
+import type { Panel } from "./panel.ts";
+import type { Limits, StepSpec } from "./tree.ts";
 
 // Everything that happens in a run is one of these events, appended in order.
 // Run state is never stored directly: it is always folded from the log.

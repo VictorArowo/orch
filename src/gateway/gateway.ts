@@ -1,6 +1,6 @@
-import type { ChatMessage, Purpose, Usage } from "../core/events.js";
-import type { Nanos, Price } from "../core/money.js";
-import type { RoleSettings } from "../core/panel.js";
+import type { ChatMessage, Purpose, Usage } from "../core/events.ts";
+import type { Nanos, Price } from "../core/money.ts";
+import type { RoleSettings } from "../core/panel.ts";
 
 export interface CompletionRequest {
   model: string;

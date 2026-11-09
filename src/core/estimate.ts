@@ -1,8 +1,8 @@
-import { costOf, type Nanos, type Price } from "./money.js";
-import { defaultDoRole, findRole, ladderModel, modelsOf, type Panel, type Role } from "./panel.js";
-import { apply, emptyState, inputIds } from "./state.js";
-import { walk, type Limits, type StepSpec, type Tree } from "./tree.js";
-import { DEFAULT_CRITIQUE_ROUNDS, DEFAULT_MAX_RETRIES } from "./step-machine.js";
+import { costOf, type Nanos, type Price } from "./money.ts";
+import { defaultDoRole, findRole, ladderModel, modelsOf, type Panel, type Role } from "./panel.ts";
+import { apply, emptyState, inputIds } from "./state.ts";
+import { walk, type Limits, type StepSpec, type Tree } from "./tree.ts";
+import { DEFAULT_CRITIQUE_ROUNDS, DEFAULT_MAX_RETRIES } from "./step-machine.ts";
 
 // A rough pre-run estimate. Low assumes every step works first time and
 // writes a typical amount; high assumes every check sends work back as often

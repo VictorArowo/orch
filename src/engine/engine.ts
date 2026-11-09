@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { hostname } from "node:os";
-import { decide, worstCase } from "../core/budget.js";
-import { checkTree } from "../core/check-tree.js";
-import type { ChatMessage, Drafted, EventBody, Purpose, RunEvent, Vote } from "../core/events.js";
-import { costOf, type Nanos } from "../core/money.js";
-import { modelsOf, type Panel, type Role } from "../core/panel.js";
-import { checkMessages, critiqueMessages, doMessages, parseList, parseObjections, parseVerdict, tally } from "../core/prompt.js";
+import { decide, worstCase } from "../core/budget.ts";
+import { checkTree } from "../core/check-tree.ts";
+import type { ChatMessage, Drafted, EventBody, Purpose, RunEvent, Vote } from "../core/events.ts";
+import { costOf, type Nanos } from "../core/money.ts";
+import { modelsOf, type Panel, type Role } from "../core/panel.ts";
+import { checkMessages, critiqueMessages, doMessages, parseList, parseObjections, parseVerdict, tally } from "../core/prompt.ts";
 import {
   blockers,
   emptyState,
@@ -19,12 +19,12 @@ import {
   versionOf,
   type AttemptState,
   type RunState,
-} from "../core/state.js";
-import { INTERRUPTED, nextAction } from "../core/step-machine.js";
-import { DEFAULT_LIMITS, expandTemplate, walk, type Limits, type Tree } from "../core/tree.js";
-import { GatewayError, type Gateway } from "../gateway/gateway.js";
-import { redact } from "../gateway/redact.js";
-import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type Store } from "../store/store.js";
+} from "../core/state.ts";
+import { INTERRUPTED, nextAction } from "../core/step-machine.ts";
+import { DEFAULT_LIMITS, expandTemplate, walk, type Limits, type Tree } from "../core/tree.ts";
+import { GatewayError, type Gateway } from "../gateway/gateway.ts";
+import { redact } from "../gateway/redact.ts";
+import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type Store } from "../store/store.ts";
 
 export interface EngineOptions {
   store: Store;

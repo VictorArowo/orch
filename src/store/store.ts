@@ -1,4 +1,4 @@
-import type { EventBody, RunEvent } from "../core/events.js";
+import type { EventBody, RunEvent } from "../core/events.ts";
 
 export interface Job {
   id: number;

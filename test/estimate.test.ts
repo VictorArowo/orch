@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { estimateTree, guessCount } from "../src/core/estimate.js";
-import { usdToNanos, type Price } from "../src/core/money.js";
-import { DEFAULT_LIMITS } from "../src/core/tree.js";
-import { harness, panel, tree } from "./helpers.js";
+import { estimateTree, guessCount } from "../src/core/estimate.ts";
+import { usdToNanos, type Price } from "../src/core/money.ts";
+import { DEFAULT_LIMITS } from "../src/core/tree.ts";
+import { harness, panel, tree } from "./helpers.ts";
 
 // Only completion tokens cost anything here, 1000 nanodollars each, so the
 // estimates are easy to read off.
