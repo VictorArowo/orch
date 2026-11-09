@@ -80,24 +80,14 @@ export function repairPlan(raw: unknown, ctx: { goal: string; panel: Panel; limi
     repairs.push(`${label}: dropped ${key} "${String(v)}", which isn't a ${job} role in the panel`);
   };
 
-  const fixStep = (step: Obj, label: string, inTemplate: boolean) => {
-    for (const k of Object.keys(step)) {
-      if (!STEP_KEYS.has(k)) {
-        delete step[k];
-        repairs.push(`${label}: removed unknown field "${k}"`);
-      }
-    }
-    if (typeof step.mode === "string") {
-      const m = MODE_ALIASES[step.mode.trim().toLowerCase()];
-      if (m && m !== step.mode) {
-        repairs.push(`${label}: mode "${step.mode}" read as "${m}"`);
-        step.mode = m;
-      }
-    }
+  // `name` is the id the parser will give the step (or, inside a template,
+  // the id of the fan-out that owns it); it only labels the repairs.
+  const fixStep = (step: Obj, defaultId: string, inTemplate: boolean, owner = "") => {
+    const early: string[] = [];
     if (step.id !== undefined) {
       if (inTemplate) {
         delete step.id;
-        repairs.push(`${label}: removed an id inside a template`);
+        early.push("removed an id inside a template");
       } else if (typeof step.id === "string") {
         const clean = step.id
           .trim()
@@ -112,6 +102,22 @@ export function repairPlan(raw: unknown, ctx: { goal: string; panel: Panel; limi
         }
       }
     }
+    const name = typeof step.id === "string" ? step.id : defaultId;
+    const label = inTemplate ? `step ${owner} template` : `step ${name}`;
+    for (const r of early) repairs.push(`${label}: ${r}`);
+    for (const k of Object.keys(step)) {
+      if (!STEP_KEYS.has(k)) {
+        delete step[k];
+        repairs.push(`${label}: removed unknown field "${k}"`);
+      }
+    }
+    if (typeof step.mode === "string") {
+      const m = MODE_ALIASES[step.mode.trim().toLowerCase()];
+      if (m && m !== step.mode) {
+        repairs.push(`${label}: mode "${step.mode}" read as "${m}"`);
+        step.mode = m;
+      }
+    }
     if (typeof step.inputs === "string") step.inputs = [step.inputs];
     if (typeof step.title !== "string" && typeof step.instructions === "string") step.title = step.instructions.slice(0, 60);
     roleFix(step, "role", "do", label);
@@ -122,11 +128,11 @@ export function repairPlan(raw: unknown, ctx: { goal: string; panel: Panel; limi
       step.items = step.items.slice(0, ctx.limits.maxFanOut);
     }
     if (Array.isArray(step.children)) {
-      step.children.forEach((c, i) => isObj(c) && fixStep(c, `step ${String(c.id ?? `${label}.${i + 1}`)}`, inTemplate));
+      step.children.forEach((c, i) => isObj(c) && fixStep(c, `${name}.${i + 1}`, inTemplate, owner));
     }
-    if (isObj(step.template)) fixStep(step.template, `${label} template`, true);
+    if (isObj(step.template)) fixStep(step.template, `${name}.template`, true, inTemplate ? owner : name);
   };
-  fixStep(plan.root, `step ${String(plan.root.id ?? "root")}`, false);
+  fixStep(plan.root, "root", false);
 
   // Ids as the tree parser will assign them, to fix duplicates and drop
   // inputs that point nowhere.
