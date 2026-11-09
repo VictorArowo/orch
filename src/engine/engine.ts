@@ -183,11 +183,12 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
     await this.tick(runId);
   }
 
-  // Work on a run until it is done, paused or stopped, with as many worker
-  // loops as the run's concurrency allows.
-  async drive(runId: string): Promise<RunState> {
+  // Work on a run until it is done, paused or stopped. By default this engine
+  // runs as many worker loops as the run's concurrency allows; other engines
+  // can work on the same run at the same time.
+  async drive(runId: string, opts: { workers?: number } = {}): Promise<RunState> {
     const state = await this.refresh(runId);
-    const loops = Array.from({ length: state.concurrency }, () => this.workerLoop(runId));
+    const loops = Array.from({ length: opts.workers ?? state.concurrency }, () => this.workerLoop(runId));
     await Promise.all(loops);
     return this.refresh(runId);
   }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { outputOf, versionOf } from "../src/core/state.js";
-import { harness, lastUser, tree } from "./helpers.js";
+import { usdToNanos } from "../src/core/money.js";
+import { Engine } from "../src/engine/engine.js";
+import { MockGateway } from "../src/gateway/mock.js";
+import { harness, lastUser, panel, tree } from "./helpers.js";
 
 describe("scheduler", () => {
   it("runs parallel steps at once, up to the concurrency limit", async () => {
@@ -84,6 +87,26 @@ describe("scheduler", () => {
     expect(expanded).toMatchObject({ stepId: "each", requested: 3 });
     expect(state.steps.each!.childIds).toEqual(["each.1", "each.2"]);
     expect(outputOf(state, "each.2")).toBe("about beta");
+    await h.close();
+  });
+
+  it("shares a run between two engines without doing any step twice", async () => {
+    const h = await harness({ latency: 10 });
+    const otherGateway = new MockGateway({ latency: 10 });
+    const other = new Engine({ store: h.store, gateway: otherGateway, pollMs: 5 });
+    const runId = await h.engine.createRun({
+      tree: tree({ id: "fan", items: ["a", "b", "c", "d", "e", "f", "g", "h"], template: {} }),
+      panel,
+      capNanos: usdToNanos(1),
+      concurrency: 4,
+    });
+    await h.engine.start(runId);
+    const [state] = await Promise.all([h.engine.drive(runId, { workers: 1 }), other.drive(runId, { workers: 1 })]);
+    expect(state.status).toBe("done");
+    for (const id of state.steps.fan!.childIds) expect(state.steps[id]!.attemptIds).toHaveLength(1);
+    expect(h.gateway.callCount).toBeGreaterThan(0);
+    expect(otherGateway.callCount).toBeGreaterThan(0);
+    expect(h.gateway.callCount + otherGateway.callCount).toBe(8);
     await h.close();
   });
 
