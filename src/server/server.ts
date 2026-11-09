@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { join, relative, resolve } from "node:path";
 import { checkTree, treeToJson } from "../core/check-tree.ts";
 import { estimateTree } from "../core/estimate.ts";
-import type { Drafted, RunEvent } from "../core/events.ts";
+import type { Drafted, RunEvent, StepPatch } from "../core/events.ts";
 import { usdToNanos } from "../core/money.ts";
 import { PanelError, parsePanel, type Panel } from "../core/panel.ts";
 import { DEFAULT_LIMITS, parseTree, TreeError, type Limits } from "../core/tree.ts";
@@ -181,6 +181,17 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
 
   const ownRun = async (user: User, runId: string) => {
     if ((await store.ownerOf(runId)) !== user.id) throw new HttpError(404, "no such run");
+  };
+
+  // The engine refuses steering it can't do (a step that hasn't finished, a
+  // role that doesn't exist) with a plain message; that's the user's to fix.
+  const steer = async <T>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err instanceof Error && !(err instanceof HttpError)) throw new HttpError(400, err.message);
+      throw err;
+    }
   };
 
   const planCap = (user: User) => usdToNanos(Math.min(user.settings.planCapUsd ?? opts.planCapUsd ?? 0.1, opts.planCapUsd ?? 1));
@@ -514,6 +525,50 @@ export async function serve(opts: ServeOptions): Promise<{ url: string; close():
         await engine.start(runId);
         drive(runId);
         return { runId };
+      },
+    ],
+
+    // ---- Steering ----
+
+    [
+      "POST",
+      /^\/api\/runs\/([\w-]+)\/steps\/([\w.-]+)\/(hold|release|skip)$/,
+      async ({ user, params }) => {
+        const [runId, stepId, action] = params as [string, string, "hold" | "release" | "skip"];
+        await ownRun(user, runId);
+        if (action !== "hold") await needKey(user);
+        await steer(() => engine[action](runId, stepId));
+        if (action !== "hold") drive(runId);
+        return { ok: true };
+      },
+    ],
+
+    [
+      "POST",
+      /^\/api\/runs\/([\w-]+)\/steps\/([\w.-]+)\/edit$/,
+      async ({ user, params, body }) => {
+        const [runId, stepId] = params as [string, string];
+        await ownRun(user, runId);
+        if (typeof body.patch !== "object" || body.patch === null || Array.isArray(body.patch)) throw new HttpError(400, "send the changes as a patch");
+        await steer(() => engine.edit(runId, stepId, body.patch as StepPatch));
+        return { ok: true };
+      },
+    ],
+
+    [
+      "POST",
+      /^\/api\/runs\/([\w-]+)\/rerun$/,
+      async ({ user, params, body }) => {
+        const runId = params[0]!;
+        await ownRun(user, runId);
+        await needKey(user);
+        const stepIds = Array.isArray(body.stepIds) ? body.stepIds.filter((x): x is string => typeof x === "string") : [];
+        if (!stepIds.length) throw new HttpError(400, "pick at least one step to re-run");
+        const rerunOpts: { model?: string; cascade?: boolean } = { cascade: body.cascade === true };
+        if (typeof body.model === "string" && body.model) rerunOpts.model = body.model;
+        const steps = await steer(() => engine.rerun(runId, stepIds, rerunOpts));
+        drive(runId);
+        return { steps };
       },
     ],
 

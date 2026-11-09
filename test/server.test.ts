@@ -354,3 +354,34 @@ describe("keys", () => {
     expect(done.json.key).toMatchObject({ source: "oauth", last4: "1234" });
   });
 });
+
+describe("steering over HTTP", () => {
+  it("pauses, edits and resumes a step, then re-runs it with what depends on it", async () => {
+    await start();
+    const c = await signedUp();
+    const tree = { goal: "g", root: { children: [{ id: "a" }, { id: "b", instructions: "Old." }, { id: "c" }] } };
+    const { runId } = (await c.call<{ runId: string }>("/api/runs", { tree, panel: "starter", capUsd: 0.5 })).json;
+    expect((await c.call(`/api/runs/${runId}/steps/b/hold`, {})).status).toBe(200);
+    const paused = await stream(c, runId, (e) => e.type === "run.paused");
+    expect(paused.at(-1)).toMatchObject({ reason: "waiting on steps you paused" });
+
+    const bad = await c.call<{ error: string }>(`/api/runs/${runId}/steps/b/edit`, { patch: { role: "critic" } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toMatch(/critique role, not a do role/);
+    expect((await c.call(`/api/runs/${runId}/steps/b/edit`, { patch: { instructions: "New and better." } })).status).toBe(200);
+    expect((await c.call(`/api/runs/${runId}/steps/b/release`, {})).status).toBe(200);
+    const rest = await stream(c, runId, (e) => e.type === "run.done", paused.at(-1)!.seq);
+    const bPrompt = rest.find((e) => e.type === "call.reserved" && e.stepId === "b") as { messages: { content: string }[] } | undefined;
+    expect(bPrompt!.messages[1]!.content).toContain("New and better.");
+
+    const r = await c.call<{ steps: string[] }>(`/api/runs/${runId}/rerun`, { stepIds: ["b"], cascade: true });
+    expect(r.json.steps).toEqual(["b", "c"]);
+    const last = rest.at(-1)!.seq;
+    const again = await stream(c, runId, (e) => e.type === "run.done", last);
+    expect(again.filter((e) => e.type === "step.done").map((e) => (e as { stepId: string }).stepId)).toEqual(["b", "c"]);
+
+    const other = await signedUp();
+    expect((await other.call(`/api/runs/${runId}/steps/b/hold`, {})).status).toBe(404);
+    expect((await other.call(`/api/runs/${runId}/rerun`, { stepIds: ["b"] })).status).toBe(404);
+  });
+});

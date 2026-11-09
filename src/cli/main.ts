@@ -45,7 +45,8 @@ Usage:
   orch run <tree.json> --panel <panel.json> --cap <usd> [options]
   orch run --goal "<goal>" --panel <panel.json> --cap <usd> [--yes] [options]
   orch resume <run-id> [--cap <usd>]
-  orch rerun <run-id> <step-id>... [--model <id>]
+  orch rerun <run-id> <step-id>... [--model <id>] [--cascade]
+  orch skip <run-id> <step-id>...
   orch show <run-id> [<step-id>]
   orch runs
 
@@ -75,6 +76,7 @@ type Flags = {
   "max-steps"?: string;
   db?: string;
   model?: string;
+  cascade?: boolean;
   goal?: string;
   out?: string;
   "plan-cap"?: string;
@@ -487,9 +489,20 @@ async function cmdRerun(args: string[], flags: Flags) {
   const [runId, ...steps] = args;
   if (!steps.length) throw new UsageError("rerun needs at least one step id");
   await withRun(runId, flags, async (engine, state) => {
-    const opts: { model?: string } = {};
+    const opts: { model?: string; cascade?: boolean } = {};
     if (flags.model) opts.model = flags.model;
-    await engine.rerun(state.runId, steps, opts);
+    if (flags.cascade) opts.cascade = true;
+    const rerun = await engine.rerun(state.runId, steps, opts);
+    if (rerun.length > steps.length) console.log(`Re-running ${rerun.join(", ")}.`);
+    report(await driveWithUi(engine, state.runId, flags));
+  });
+}
+
+async function cmdSkip(args: string[], flags: Flags) {
+  const [runId, ...steps] = args;
+  if (!steps.length) throw new UsageError("skip needs at least one step id");
+  await withRun(runId, flags, async (engine, state) => {
+    for (const s of steps) await engine.skip(state.runId, s);
     report(await driveWithUi(engine, state.runId, flags));
   });
 }
@@ -596,6 +609,7 @@ async function main() {
       "max-steps": { type: "string" },
       db: { type: "string" },
       model: { type: "string" },
+      cascade: { type: "boolean" },
       goal: { type: "string" },
       out: { type: "string" },
       "plan-cap": { type: "string" },
@@ -620,6 +634,8 @@ async function main() {
       return cmdResume(args, flags);
     case "rerun":
       return cmdRerun(args, flags);
+    case "skip":
+      return cmdSkip(args, flags);
     case "show":
       return cmdShow(args, flags);
     case "runs":
