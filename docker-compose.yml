@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: orch
+      POSTGRES_PASSWORD: orch
+      POSTGRES_DB: orch
+    ports:
+      - "5433:5432"
+    volumes:
+      - orch-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orch"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  orch-pg:
