@@ -9,13 +9,14 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
 import { layout } from "orch/src/view/layout.ts";
 import { edgesOf, type ViewNode } from "orch/src/view/view.ts";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 export type Tone = "role" | "dim" | "faint" | "run" | "done" | "fail" | "blocked" | "stale" | "ink";
 export type CardStatus = "idle" | "pending" | "running" | "blocked" | "done" | "failed";
@@ -116,10 +117,11 @@ function Card({ data, stacked }: { data: Data; stacked?: boolean }) {
           ))}
         </div>
         <div className="mt-auto flex items-end gap-2 pt-1">
-          <div className="flex min-w-0 flex-1 flex-wrap gap-x-2.5 gap-y-0.5 text-[12px] leading-snug">
-            {info?.count && <span className="font-semibold text-ink">{info.count}</span>}
+          {/* One line; anything that doesn't fit is in the side panel. */}
+          <div className="min-w-0 flex-1 truncate text-[12px] leading-snug" title={info?.tags.map((t) => t.text).join(", ")}>
+            {info?.count && <span className="mr-2.5 font-semibold text-ink">{info.count}</span>}
             {info?.tags.map((t, i) => (
-              <span key={i} className={TONE[t.tone ?? "faint"]}>
+              <span key={i} className={`mr-2.5 ${TONE[t.tone ?? "faint"]}`}>
                 {t.text}
               </span>
             ))}
@@ -178,6 +180,24 @@ export interface CanvasProps {
 }
 
 function Inner({ root, info, selected, onSelect, active, still }: CanvasProps) {
+  const { fitView } = useReactFlow();
+  const box = useRef<HTMLDivElement>(null);
+  // Refit when the canvas itself changes size: the side panel being dragged,
+  // or the header above growing once its content loads.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(() => void fitView({ padding: 0.12 }), 60);
+    });
+    ro.observe(el);
+    return () => {
+      clearTimeout(t);
+      ro.disconnect();
+    };
+  }, [fitView]);
   const placed = useMemo(() => layout(root), [root]);
   const shape = placed.nodes.map((n) => n.id).join("|");
 
@@ -233,8 +253,9 @@ function Inner({ root, info, selected, onSelect, active, still }: CanvasProps) {
 
 
   return (
-    // A new shape (a fan-out expanding, a step added) remounts the canvas, so
-    // React Flow fits the whole tree once it has measured the new nodes.
+    <div ref={box} className="h-full w-full">
+    {/* A new shape (a fan-out expanding, a step added) remounts the canvas, so
+        React Flow fits the whole tree once it has measured the new nodes. */}
     <ReactFlow
       key={shape}
       nodes={nodes}
@@ -259,6 +280,7 @@ function Inner({ root, info, selected, onSelect, active, still }: CanvasProps) {
       <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#d3d6d0" />
       {!still && <Controls showInteractive={false} position="bottom-left" />}
     </ReactFlow>
+    </div>
   );
 }
 

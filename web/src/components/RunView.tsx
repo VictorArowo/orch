@@ -6,7 +6,9 @@ import { apply, emptyState, isLeaf, isStale, stepCost, stepStatus, type RunState
 import { viewOfRun, type ViewNode } from "orch/src/view/view.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, type CardInfo, type CardStatus } from "./Canvas";
+import { ResultReader } from "./ResultReader";
 import { RunInspector } from "./RunInspector";
+import { SidePanel } from "./SidePanel";
 import { Button, ErrorNote, inputClass, shortModel, Status } from "./ui";
 import { post } from "@/lib/api";
 
@@ -108,6 +110,7 @@ export function RunView({ runId }: { runId: string }) {
   const [error, setError] = useState<string>();
   const [cap, setCap] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
 
   // Follow the run's events and fold them with the engine's own reducer.
   useEffect(() => {
@@ -196,6 +199,11 @@ export function RunView({ runId }: { runId: string }) {
             </span>
           </div>
           <div className="ml-auto flex items-center gap-3">
+            {state.status === "done" && (
+              <Button tone="primary" onClick={() => setReading(true)}>
+                Read the result
+              </Button>
+            )}
             {running && (
               <Button onClick={() => void control("pause")} disabled={busy}>
                 Pause
@@ -230,10 +238,11 @@ export function RunView({ runId }: { runId: string }) {
         <div className="min-w-0 flex-1 border-t border-rule">
           <Canvas root={view} info={cards} selected={selected} onSelect={setSelected} active={active} />
         </div>
-        <aside className="scroll-thin w-[420px] shrink-0 overflow-y-auto border-t border-l border-rule bg-sheet px-5 py-5">
+        <SidePanel storageKey="orch:run-panel" defaultWidth={440}>
           <RunInspector state={state} selected={selected} version={version} />
-        </aside>
+        </SidePanel>
       </div>
+      {reading && <ResultReader state={state} onClose={() => setReading(false)} />}
     </div>
   );
 }

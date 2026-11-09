@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
-export function Button({ tone = "plain", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "plain" | "primary" | "danger" }) {
+export function Button({ tone = "plain", className = "", ...props }: ComponentProps<"button"> & { tone?: "plain" | "primary" | "danger" }) {
   const styles = {
     plain: "border-ink/20 bg-sheet text-ink hover:border-ink/50",
     primary: "border-ink bg-ink text-paper hover:bg-ink-soft",

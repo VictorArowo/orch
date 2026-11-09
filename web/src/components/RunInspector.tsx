@@ -12,6 +12,7 @@ const REASON: Record<AttemptReason, string> = {
   check: "after the check sent it back",
   critique: "after the critique",
   format: "after a malformed reply",
+  length: "with more room, after running out",
   error: "after an error",
   rerun: "re-run",
 };

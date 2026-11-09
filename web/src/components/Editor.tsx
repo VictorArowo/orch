@@ -12,6 +12,7 @@ import { viewOfSpec, type ViewNode } from "orch/src/view/view.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, type CardInfo } from "./Canvas";
 import { PanelNote } from "./PanelNote";
+import { SidePanel } from "./SidePanel";
 import { StepForm } from "./StepForm";
 import { Button, ErrorNote, inputClass, shortModel } from "./ui";
 import { get, post, type CheckResponse, type PanelEntry } from "@/lib/api";
@@ -282,7 +283,7 @@ export function Editor() {
         <div className="min-w-0 flex-1 border-t border-rule">
           <Canvas root={view} info={cards} selected={selected} onSelect={setSelected} />
         </div>
-        <aside className="scroll-thin w-[380px] shrink-0 overflow-y-auto border-t border-l border-rule bg-sheet px-5 py-5">
+        <SidePanel storageKey="orch:editor-panel" defaultWidth={380}>
           {selected ? (
             <StepForm
               tree={tree}
@@ -312,7 +313,7 @@ export function Editor() {
               <p className="note text-graphite">The estimate is a range. The low end assumes every step works first time; the high end assumes every review sends work back and every reply uses its full length.</p>
             </div>
           )}
-        </aside>
+        </SidePanel>
       </div>
     </div>
   );
