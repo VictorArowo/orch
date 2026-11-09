@@ -3,3 +3,4 @@ dist/
 .env
 .orch/
 *.tsbuildinfo
+.DS_Store
