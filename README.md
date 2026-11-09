@@ -12,21 +12,15 @@ You need Node 22 and pnpm.
 pnpm install
 ```
 
-Start the engine service and the web app together, on mock models that cost nothing:
-
-```bash
-pnpm dev --mock
-```
-
-Open http://localhost:3000, create an account, and draft a plan from one of the example goals. The editor shows the tree on a canvas with a cost estimate per step. Click a step to change its instructions, role, model or reviewers. Run it, and the tree fills in live: steps not started are pencilled in, the steps working now are highlighted, finished ones are inked. Click any step to see what it was told, what it did, who reviewed it and what each call cost.
-
-To use real models, start it without `--mock`:
+Start the engine service and the web app together:
 
 ```bash
 pnpm dev
 ```
 
-Then add a key in Settings, under API keys. Connect with OpenRouter creates a key for orch in your OpenRouter account through OpenRouter's OAuth flow; you can set a spending limit on it, or revoke it, from your OpenRouter dashboard. Pasting a key works too. Either way the key is encrypted before it's stored, decrypted only while a call is being made, and never shown again. OpenRouter bills you directly; orch never handles payment.
+Open http://localhost:3000 and create an account. Before anything can run, add your OpenRouter key in Settings, under API keys. Connect with OpenRouter creates a key for orch in your OpenRouter account through OpenRouter's OAuth flow; you can set a spending limit on it, or revoke it, from your OpenRouter dashboard. Pasting a key works too. Either way the key is encrypted before it's stored, decrypted only while a call is being made, and never shown again. OpenRouter bills you directly; orch never handles payment.
+
+Then draft a plan from one of the example goals. The editor shows the tree on a canvas with a cost estimate per step. Click a step to change its instructions, role, model or reviewers. Run it, and the tree fills in live: steps not started are pencilled in, the steps working now are highlighted, finished ones are inked. Click any step to see what it was told, what it did, who reviewed it and what each call cost.
 
 Settings also covers your profile, password, default panel and spending limits, and deleting the account (which deletes its runs, saved trees and stored key).
 
@@ -95,7 +89,7 @@ orch resume <run-id> [--cap <usd>]
 orch rerun <run-id> <step-id>... [--model <id>]
 orch show <run-id> [<step-id>]
 orch runs
-orch serve [--port <n>] [--mock]
+orch serve [--port <n>]
 ```
 
 Drafting a tree may spend up to `--plan-cap` (default $0.10) across its attempts. With `run --goal` that cost also counts against the run's cap. `plan` and `run` also take `--max-depth`, `--max-fan-out` and `--max-steps`. Every command takes `--db` to pick a database and `--no-live` to print events line by line instead of redrawing the tree. Use `pnpm orch ...` from the repo, or `pnpm build && pnpm link --global` for a plain `orch` command.
@@ -146,7 +140,16 @@ A panel is a list of roles. Each role has a name, a job (`plan`, `do`, `check` o
 - `"ladder": ["cheap", "stronger"]` for a do role that moves up a rung each time a check sends its work back;
 - `"jury": ["a", "b", "c"]` for a check or critique role whose models vote, with a strict majority needed to send work back.
 
-Settings such as `maxTokens`, `temperature` and `reasoningEffort` go in `settings`. [panels/starter.json](panels/starter.json) is the panel used above.
+Settings such as `maxTokens`, `temperature` and `reasoningEffort` go in `settings`, and `description` is the one line shown wherever the panel is picked.
+
+orch ships six panels in [panels/](panels). They all cast the same roles (planner, researcher, analyst, writer, fact-checker, editor and critic), so any tree runs on any of them and you can compare what the cast changes:
+
+- starter: cheap models research and step up when sent back, Gemini Flash compares, Claude Sonnet writes, and a critic from another family pushes back.
+- budget: small, fast models in every role, for trying a plan out cheaply.
+- heavyweight: the strongest models throughout, at ten or more times the cost.
+- mixed: each role on a different model family, so no model reviews its own family's work.
+- open-weights: DeepSeek, Qwen, Kimi and Llama only.
+- solo: Claude Sonnet in every role, as a baseline.
 
 ## How it works
 
@@ -166,7 +169,7 @@ Re-running a step starts a new attempt and keeps the old ones. Each attempt reco
 pnpm test
 ```
 
-The tests use the mock gateway and an in-memory PGlite, so they need no key, network or Docker. They cover accounts, sessions and key encryption, the engine service and its event streams, the canvas layout and tree edits, the planner (repairs, retries and its cap), estimates, the scheduler, reservations and reconciliation, pausing on the cap, ladders, checks, juries and critiques, stale tracking on re-runs, and resuming after a simulated crash. To run the store tests against the Docker Postgres as well:
+The tests use a mock gateway in place of OpenRouter and an in-memory PGlite, so they need no key, network or Docker, and never spend anything. The web app and the engine service have no mock mode; only the CLI's `--mock` flag uses the mock models. They cover accounts, sessions and key encryption, the engine service and its event streams, the canvas layout and tree edits, the planner (repairs, retries and its cap), estimates, the scheduler, reservations and reconciliation, pausing on the cap, ladders, checks, juries and critiques, stale tracking on re-runs, and resuming after a simulated crash. To run the store tests against the Docker Postgres as well:
 
 ```bash
 ORCH_TEST_DATABASE_URL=postgres://orch:orch@localhost:5433/orch pnpm test

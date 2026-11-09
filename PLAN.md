@@ -1,6 +1,6 @@
 # orch: plan
 
-`orch` is a working name. This is a portfolio project, not a product. It should be fun to build, satisfying to watch, and a good piece of engineering to talk about.
+`orch` is a working name. It started as a portfolio project and is now built as a real product: accounts, stored keys and settings, with every run on the user's own key. It should still be fun to build, satisfying to watch, and a good piece of engineering to talk about.
 
 ## What it is
 
@@ -150,7 +150,8 @@ TypeScript throughout. kestrel pairs a Rust engine with a Next.js app; orch keep
 - Engine: a separate TypeScript service that owns the scheduler, the role loops, budgets and steering. Runs keep going when the browser closes.
 - Durability: steps run as jobs from a Postgres-backed queue, so a run survives a restart. That's simpler than Temporal or Inngest and enough for this project. Locally, an embedded Postgres (PGlite) runs the same schema, so no server is needed.
 - Storage: Postgres for accounts, encrypted keys, runs, steps, attempts and the event log.
-- Accounts: GitHub and Google sign-in through an auth library such as Auth.js or Better Auth.
+- Accounts: email and password for now, held by the engine service next to runs, since the embedded database can only be opened by one process. GitHub and Google sign-in come later, once OAuth apps exist for them.
+- Mock models are only for the automated tests and the CLI's `--mock` flag. The engine service and web app always call real models.
 - Models: one gateway, most likely OpenRouter, using each user's own key. See [Keys and models](#keys-and-models).
 - Tools: web search and page fetch, both read-only to start. The fetcher refuses private and internal addresses, and fetched pages are treated as untrusted text, never as instructions.
 
@@ -178,13 +179,13 @@ Later, if it's still fun:
 2. Planner. Goal to tree with roles and estimates. Try it on ten varied goals and tune it until the trees look sensible.
 3. Tree editor and live run view. Shape a plan in the browser, run it, and watch it live.
 4. Steering. Pause, edit, swap models and re-run, including stale-output tracking.
-5. Inspector, replay and public demo. Record three or four good runs and make them replayable on the site. Add accounts, connecting OpenRouter and encrypted key storage, so signed-in users can run live.
+5. Inspector, replay and public demo. Record three or four good runs and make them replayable on the site. (Accounts, connecting OpenRouter and encrypted key storage were brought forward and are done.)
 6. Write-up. A post in the style of the others, for example "the same goal with three panels": what the trees looked like, where models disagreed, and what each run cost.
 
 ## Open decisions
 
 - Name.
-- Tree or canvas: a collapsible tree is quicker to build, while a node canvas (React Flow, which you've forked before) demos better.
+- Tree or canvas: decided, a node canvas (React Flow), drawn like a score: parallel steps joined by a bracket, pending work pencilled in, the step playing highlighted, finished work inked.
 - Gateway: OpenRouter is the likely choice for its OAuth flow. Vercel AI Gateway, used in jev-chess, is the alternative, but it would mean pasted keys only.
 - Where the master key lives: a cloud KMS (AWS, GCP) or a separate secret in the host's environment.
 - Hosting: where the public demo lives, and whether live runs are possible there at all.
