@@ -56,6 +56,8 @@ Run
 - Attempt: one go at a step. Re-running a step creates a new attempt, so old results are kept for comparison.
 - Event: an append-only record of everything that happens. The UI and replays are built from it.
 
+A run that can't finish because a step failed ends as stopped, with the reason; there's no separate failed status. Re-running a step in a done run reopens it until that step finishes.
+
 ## Panels
 
 A panel is the cast for a run: the roles you want and which model plays each one.
@@ -74,13 +76,15 @@ orch has no fixed list of roles. You define each one:
 - the tools it may use;
 - its model or models, plus settings such as reasoning effort.
 
-A run needs at least one plan role and one do role. Check and critique roles are optional extras you can add where they help. orch ships a few starter panels so a first run doesn't need any setup.
+A run needs at least one plan role and one do role, though a hand-written tree only needs the do role. Check and critique roles are optional extras you can add where they help. orch ships a few starter panels so a first run doesn't need any setup.
 
 ### More than one model in a role
 
 - Single: one model plays the role.
 - Ladder: start on a cheap model and move up to a stronger one if a check sends the work back.
 - Jury: several models review the same output and vote, and you see where they disagree.
+
+Ladders are for do roles and juries for check and critique roles; a single model works anywhere. A jury sends work back only when a strict majority of the votes cast say so, and replies that can't be parsed don't count either way.
 
 ### Comparing panels
 
@@ -91,16 +95,17 @@ Run the same tree with two panels side by side and compare the outputs, time and
 1. Draft. The plan role turns the goal into a tree, assigns a role to each step and estimates the cost.
 2. Shape. You edit the tree: add, remove or reorder steps, switch fan-out on or off, change roles and models, and set the budget cap. Nothing runs until you press run.
 3. Run. The scheduler runs ready steps in parallel up to a concurrency limit. Each step gets only its own instructions and inputs, not the whole run's history, and returns structured output.
-4. Review, if you added it. A check role reviews a step and can send it back once or twice with notes. A critique role objects, and the step's role responds.
-5. Steer. At any point you can pause the run or a branch, edit a step, swap its model, skip it, or re-run it. Re-running a step marks everything that used its old output as stale and offers to re-run those too.
+4. Review, if you added it. A check role reviews a step and can send it back with notes, twice by default. If the check still wants changes after that, the last output is accepted with a warning rather than failing the step. A critique role objects once, the step's role revises, and the revision goes through the check again.
+5. Steer. At any point you can pause the run or a branch, edit a step, swap its model, skip it, or re-run it. Re-running a step marks everything that used its old output as stale and offers to re-run those too. Open gap: re-running the step a fan-out reads its list from doesn't rebuild the fan-out, so the branches stay as they were.
 6. Finish. The root step produces the result. It's shown next to the tree with a cost breakdown per step.
 
 ## Cost
 
 - Estimate before you run, per step and for the whole tree, based on the models' prices and rough token counts per kind of step.
 - Live spend per step and for the run, in money rather than tokens.
-- A hard cap. Before each model call, the engine reserves that call's worst-case cost (its token limit times the price) against the cap and releases what isn't used afterwards. When nothing more fits under the cap, the run pauses and asks.
-- Limits on tree depth and fan-out width, so a planner can't spawn 50 agents for a simple question.
+- A hard cap. Before each model call, the engine reserves that call's worst-case cost against the cap and releases what isn't used afterwards. The worst case is the completion limit times the output price, plus the prompt's UTF-8 byte count times the input price, since a prompt can't have more tokens than bytes. That overstates the prompt about fourfold, but only until the call settles. A call that doesn't fit next to the calls in flight waits for them. When nothing more fits under the cap, the run pauses and asks.
+- A call cut off by a crash or a hard stop may or may not have been billed, so it counts at its full reservation.
+- Limits on tree depth and fan-out width, so a planner can't spawn 50 agents for a simple question. When a step returns a longer list than the fan-out limit allows, the extra items are dropped and the log records how many were asked for.
 
 ## Keys and models
 
@@ -139,11 +144,11 @@ Running locally needs none of this: keys come from a `.env` file, and nothing le
 
 ## Architecture
 
-TypeScript end to end, like kestrel.
+TypeScript throughout. kestrel pairs a Rust engine with a Next.js app; orch keeps the engine in TypeScript too.
 
 - Web app: Next.js and React, with live updates streamed from the event log over server-sent events.
 - Engine: a separate TypeScript service that owns the scheduler, the role loops, budgets and steering. Runs keep going when the browser closes.
-- Durability: steps run as jobs from a Postgres-backed queue, so a run survives a restart. That's simpler than Temporal or Inngest and enough for this project.
+- Durability: steps run as jobs from a Postgres-backed queue, so a run survives a restart. That's simpler than Temporal or Inngest and enough for this project. Locally, an embedded Postgres (PGlite) runs the same schema, so no server is needed.
 - Storage: Postgres for accounts, encrypted keys, runs, steps, attempts and the event log.
 - Accounts: GitHub and Google sign-in through an auth library such as Auth.js or Better Auth.
 - Models: one gateway, most likely OpenRouter, using each user's own key. See [Keys and models](#keys-and-models).
