@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { hostname } from "node:os";
 import { decide, worstCase } from "../core/budget.js";
-import type { ChatMessage, EventBody, Purpose, RunEvent, Vote } from "../core/events.js";
+import { checkTree } from "../core/check-tree.js";
+import type { ChatMessage, Drafted, EventBody, Purpose, RunEvent, Vote } from "../core/events.js";
 import { costOf, type Nanos } from "../core/money.js";
 import { modelsOf, type Panel, type Role } from "../core/panel.js";
 import { checkMessages, critiqueMessages, doMessages, parseList, parseObjections, parseVerdict, tally } from "../core/prompt.js";
@@ -11,7 +12,6 @@ import {
   emptyState,
   apply,
   epochAttempts,
-  findCycle,
   inputIds,
   isLeaf,
   outputOf,
@@ -21,7 +21,7 @@ import {
   type RunState,
 } from "../core/state.js";
 import { INTERRUPTED, nextAction } from "../core/step-machine.js";
-import { DEFAULT_LIMITS, expandTemplate, validateTree, walk, type Limits, type Tree } from "../core/tree.js";
+import { DEFAULT_LIMITS, expandTemplate, walk, type Limits, type Tree } from "../core/tree.js";
 import { GatewayError, type Gateway } from "../gateway/gateway.js";
 import { redact } from "../gateway/redact.js";
 import { LostLeaseError, type Job, type LockedContext, type LockedWrite, type Store } from "../store/store.js";
@@ -44,6 +44,8 @@ export interface CreateRunOptions {
   capNanos: Nanos;
   limits?: Partial<Limits>;
   concurrency?: number;
+  // Set when the tree came from the planner in the same command.
+  drafted?: Drafted;
 }
 
 class Killed extends Error {}
@@ -110,10 +112,11 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
 
   async createRun(opts: CreateRunOptions): Promise<string> {
     const limits = { ...DEFAULT_LIMITS, ...opts.limits };
-    const { models } = validateTree(opts.tree, opts.panel, limits);
+    const { models } = checkTree(opts.tree, opts.panel, limits);
     // Every model must have a known price before anything runs, or the cap
     // can't be enforced. This also catches typos in model ids.
     for (const m of models) await this.gateway.price(m);
+    if (opts.drafted && opts.drafted.costNanos > opts.capNanos) throw new Error("planning already spent more than the cap");
     const created: EventBody = {
       type: "run.created",
       goal: opts.tree.goal,
@@ -125,12 +128,14 @@ export class Engine extends EventEmitter<{ event: [RunEvent] }> {
       gateway: this.gateway.name,
     };
     const runId = newRunId();
-    const probe = apply(emptyState(runId), { ...created, runId, seq: 1, at: new Date().toISOString() });
-    const cycle = findCycle(probe);
-    if (cycle) throw new Error(`steps wait on each other in a loop: ${cycle.join(" → ")}`);
     this.guard();
     const first = await this.store.createRun(runId, created);
     this.ingest(runId, [first]);
+    // Planning happened before the run existed; its cost still counts against the cap.
+    if (opts.drafted) {
+      const drafted = opts.drafted;
+      await this.locked(runId, () => ({ events: [{ type: "run.drafted", ...drafted }] }));
+    }
     return runId;
   }
 

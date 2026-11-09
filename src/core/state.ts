@@ -1,4 +1,4 @@
-import type { AttemptReason, ChatMessage, Purpose, RunEvent, Usage, Vote } from "./events.js";
+import type { AttemptReason, ChatMessage, Drafted, Purpose, RunEvent, Usage, Vote } from "./events.js";
 import type { Nanos } from "./money.js";
 import type { Panel } from "./panel.js";
 import type { Limits, StepSpec } from "./tree.js";
@@ -89,6 +89,7 @@ export interface RunState {
   calls: Record<string, CallState>;
   spentNanos: Nanos;
   reservedNanos: Nanos;
+  drafted?: Drafted;
   lastSeq: number;
   createdAt: string;
   updatedAt: string;
@@ -168,6 +169,10 @@ export function apply(state: RunState, e: RunEvent): RunState {
       state.rootId = e.root.id;
       state.createdAt = e.at;
       addStep(state, e.root, undefined, 1);
+      break;
+    case "run.drafted":
+      state.drafted = { model: e.model, costNanos: e.costNanos, attempts: e.attempts, repairs: e.repairs };
+      state.spentNanos += e.costNanos;
       break;
     case "run.started":
       state.status = "running";

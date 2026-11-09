@@ -79,7 +79,7 @@ export function critiqueMessages(opts: { role: Role; goal: string; step: StepSpe
 
 // Find the first JSON value of the expected kind in a model reply, tolerating
 // code fences and surrounding prose.
-function extractJson(text: string, open: "[" | "{"): unknown {
+export function extractJson(text: string, open: "[" | "{"): unknown {
   const close = open === "[" ? "]" : "}";
   const start = text.indexOf(open);
   const end = text.lastIndexOf(close);

@@ -23,6 +23,14 @@ export interface Vote {
   notes: string[];
 }
 
+// What drafting the tree cost, when the planner made it.
+export interface Drafted {
+  model: string;
+  costNanos: Nanos;
+  attempts: number;
+  repairs: string[];
+}
+
 export type AttemptReason = "initial" | "check" | "critique" | "format" | "error" | "rerun";
 
 export type EventBody =
@@ -36,6 +44,7 @@ export type EventBody =
       concurrency: number;
       gateway: string;
     }
+  | ({ type: "run.drafted" } & Drafted)
   | { type: "run.started" }
   | { type: "run.paused"; reason: string; neededNanos?: Nanos }
   | { type: "run.resumed"; cap?: Nanos }
