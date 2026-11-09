@@ -61,10 +61,13 @@ const FORMAT = `The plan is JSON: {"goal": "...", "root": <step>}. A step has:
 
 const GUIDELINES = `- Use as few steps as the goal needs. A simple factual question is a single leaf step.
 - Run independent work in parallel, then combine it in a later step.
-- When the things to fan out over aren't known yet, add a leaf that lists them and use itemsFrom.
-- Give the final writing step the combined inputs it needs.
+- When several steps would do the same work for different things, use one parallel step with "items" and a template instead of near-identical siblings. When the things aren't known yet, add a leaf that lists them and use "itemsFrom".
+- The run's result is the root step's output: for a sequence, its last child's; for a parallel step, all its children's together. Make the last step produce the whole deliverable, with the combined inputs it needs. Never add a step that only copies earlier outputs together.
 - Assign the cheapest suitable role; save stronger roles for synthesis and writing.
-- Add check and critique roles sparingly: each one adds model calls.`;
+- A check or critique makes the step revise its own output until the review is satisfied. Never add a separate step to review, edit or revise another step's output.
+- Reviews cost extra model calls, so most plans need two or fewer. Put a check on steps whose facts later steps rely on, and a critique on the final deliverable at most. Never put both on the same step.
+- Each role already receives its own instructions, so don't repeat them in step instructions. Don't invent an audience, budget or constraint the goal doesn't give.
+- Instructions say what to produce, not what the answer is.`;
 
 function roleLine(r: Role): string {
   const what = r.instructions.trim().replace(/\s+/g, " ");

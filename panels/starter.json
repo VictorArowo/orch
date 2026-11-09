@@ -24,7 +24,7 @@
     {
       "name": "writer",
       "job": "do",
-      "instructions": "Write plainly for a technical founder. Lead with the answer.",
+      "instructions": "Write plainly and lead with the answer.",
       "model": "anthropic/claude-sonnet-5.5",
       "settings": { "maxTokens": 1500 }
     },
@@ -45,7 +45,7 @@
     {
       "name": "critic",
       "job": "critique",
-      "instructions": "You are a sceptical staff engineer. Push on cost, lock-in and operational risk.",
+      "instructions": "You are a sceptical expert reviewer. Push on unsupported claims, missing options, cost and risk.",
       "model": "openai/gpt-5.6-luna",
       "settings": { "maxTokens": 600 }
     }
