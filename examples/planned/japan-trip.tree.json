@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "goal": "Plan a two-week trip to Japan in spring for two people on a mid-range budget.",
+  "root": {
+    "id": "root",
+    "title": "Plan Japan spring trip",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "research",
+        "title": "Research trip fundamentals",
+        "mode": "parallel",
+        "children": [
+          {
+            "id": "timing",
+            "title": "Timing and route options",
+            "mode": "leaf",
+            "role": "researcher",
+            "instructions": "Research spring travel in Japan (March to May). Cover: cherry blossom timing by region and how reliable forecasts are, Golden Week (late April to early May) crowding and price impact, weather by month, and the cheapest and quietest windows. Then propose 2 or 3 realistic 14-day route options for first or second-time visitors (for example Tokyo, Hakone or Nikko, Kyoto, Osaka, Nara, Hiroshima, plus one optional alternative such as Kanazawa or Takayama). For each, give the days per place and the main transport legs. Say where you are unsure."
+          },
+          {
+            "id": "costs",
+            "title": "Mid-range cost data",
+            "mode": "leaf",
+            "role": "researcher",
+            "check": "fact-checker",
+            "instructions": "Gather current approximate costs in Japan for two people travelling mid-range: return flights from a major hub (state the assumption and that prices vary by origin), hotel or business-hotel and ryokan nightly rates for a double room in Tokyo, Kyoto and Osaka in spring, daily food costs, local transport, attraction entry fees, and intercity transport. For intercity transport, compare the JR Pass (after the October 2023 price increase) with individual Shinkansen and other tickets and IC cards, and say which is likely cheaper for a typical route. Give ranges in JPY and approximate USD, and flag figures you are unsure about or that may be out of date."
+          },
+          {
+            "id": "practical",
+            "title": "Practical requirements",
+            "mode": "leaf",
+            "role": "researcher",
+            "instructions": "List practical points for a two-week spring trip to Japan: visa and entry rules (and that they depend on nationality, so say to check), Visit Japan Web, booking lead times for spring accommodation and popular sights, luggage forwarding, cash versus card use, eSIM or pocket Wi-Fi, etiquette basics, and key risks (crowds, rain, hay fever, earthquake and typhoon awareness, travel insurance). Be concise and say where you are unsure."
+          }
+        ]
+      },
+      {
+        "id": "final",
+        "title": "Write the trip plan",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "timing",
+          "costs",
+          "practical"
+        ],
+        "critique": "critic",
+        "instructions": "Write the final trip plan for two people on a mid-range budget for 14 days in Japan in spring. Lead with a recommended route and dates window in two or three sentences. Then include: a day-by-day itinerary outline, a budget table with low, mid and high totals for two people by category (flights, lodging, food, transport, activities, buffer), a transport recommendation (JR Pass or not), a booking timeline, and a short list of risks and practical tips. Mention one alternative route and when you would choose it. State assumptions (such as departure region) and flag uncertain figures. Do not invent constraints the user has not given."
+      }
+    ]
+  }
+}

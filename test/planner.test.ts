@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkTree, treeToJson } from "../src/core/check-tree.ts";
 import { usdToNanos } from "../src/core/money.ts";
 import { parsePanel } from "../src/core/panel.ts";
-import { DEFAULT_LIMITS, parseTree } from "../src/core/tree.ts";
+import { DEFAULT_LIMITS, parseTree, walk } from "../src/core/tree.ts";
 import { GatewayError } from "../src/gateway/gateway.ts";
 import { MockGateway } from "../src/gateway/mock.ts";
 import { plan, PlanError } from "../src/planner/planner.ts";
@@ -159,6 +159,25 @@ describe("repairs", () => {
     const raw = { root: { children: [{ id: "a", inputs: ["b"] }, { id: "b" }] } };
     const { value } = repairPlan(raw, ctx);
     expect(() => checkTree(parseTree(value), panel, ctx.limits)).toThrow(/loop/);
+  });
+});
+
+describe("trees drafted by the real planner", () => {
+  // Saved from a tuning run against OpenRouter, one per goal in goals.json.
+  const files = readdirSync("examples/planned").filter((f) => f.endsWith(".tree.json"));
+
+  it("has one per example goal", () => {
+    expect(files.map((f) => f.replace(".tree.json", "")).sort()).toEqual(goals.map((g) => g.id).sort());
+  });
+
+  it.each(files)("%s still validates, round-trips and stays within its expected size", (file) => {
+    const t = parseTree(JSON.parse(readFileSync(`examples/planned/${file}`, "utf8")));
+    expect(() => checkTree(t, starter, DEFAULT_LIMITS)).not.toThrow();
+    expect(parseTree(treeToJson(t))).toEqual(t);
+    const goal = goals.find((g) => `${g.id}.tree.json` === file)!;
+    let steps = 0;
+    walk(t.root, () => steps++);
+    expect(steps).toBeLessThanOrEqual(goal.maxSteps);
   });
 });
 

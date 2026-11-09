@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "goal": "Write a 1,000-word blog post explaining event sourcing to frontend developers.",
+  "root": {
+    "id": "root",
+    "title": "Event sourcing blog post",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "research",
+        "title": "Research event sourcing for frontend context",
+        "mode": "leaf",
+        "role": "researcher",
+        "check": "fact-checker",
+        "instructions": "Produce concise, accurate notes for a blog post explaining event sourcing to frontend developers. Cover: a precise definition (state as an append-only log of events, current state derived by replaying/folding events); how it differs from CRUD/storing only current state; key terms (event, event store, projection/read model, snapshot, replay, CQRS and how it relates); benefits (audit trail, time travel/debugging, rebuilding state, undo/redo) and costs/risks (eventual consistency, event schema versioning, complexity, when not to use it). Include frontend-relevant links: Redux and reducers as (state, event) => state, the Elm architecture, undo/redo, optimistic UI, offline-first/sync, and how a frontend typically consumes event-sourced backends (read models, eventual consistency, handling stale reads). Give one small, correct code example idea (e.g. a shopping cart reducer folding events into state) with the actual short TypeScript code. Mark anything you are unsure of."
+      },
+      {
+        "id": "post",
+        "title": "Write the blog post",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "research"
+        ],
+        "critique": "critic",
+        "instructions": "Write a blog post of about 1,000 words (950-1,050) explaining event sourcing to frontend developers. Lead with a plain one- or two-sentence answer to what event sourcing is. Use the research notes only for facts. Structure: a title, a short intro, what event sourcing is versus storing current state, a worked TypeScript example (cart events folded by a reducer), how it connects to Redux/reducers and undo/redo, what it means for a frontend consuming an event-sourced backend (eventual consistency, read models, optimistic UI), when to use it and when not to, and a short takeaway. Use headings and keep the tone plain and practical. Output only the finished post in Markdown."
+      }
+    ]
+  }
+}

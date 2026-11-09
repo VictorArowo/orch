@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "goal": "Propose pricing tiers for a developer tool with a free plan, based on how five similar tools price.",
+  "root": {
+    "id": "root",
+    "title": "Propose developer tool pricing tiers",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "pick",
+        "title": "Pick five comparable tools",
+        "mode": "leaf",
+        "role": "researcher",
+        "output": "list",
+        "instructions": "Name five well-known developer tools that offer a free plan plus paid tiers and are reasonably similar to each other (for example hosted developer services such as error monitoring, CI, API platforms or deployment platforms). Choose tools whose public pricing pages are clear. Names only, one per item."
+      },
+      {
+        "id": "research",
+        "title": "Research each tool's pricing",
+        "mode": "parallel",
+        "itemsFrom": "pick",
+        "template": {
+          "title": "Pricing of {{item}}",
+          "mode": "leaf",
+          "role": "researcher",
+          "check": "fact-checker",
+          "instructions": "Summarise the current public pricing of {{item}}: each tier name, price per month (and per seat if applicable), the free plan's limits, the main usage limits and features that differ between tiers, the pricing metric used (seats, usage, projects, etc.), and any enterprise or custom tier. Note anything you are unsure of or that may be out of date."
+        }
+      },
+      {
+        "id": "compare",
+        "title": "Compare the pricing models",
+        "mode": "leaf",
+        "role": "analyst",
+        "instructions": "Build a tight comparison table of the five tools: tier names, prices, pricing metric, free plan limits, and the features that gate upgrades. Then list the common patterns (number of tiers, typical price points, what the free plan includes, what triggers upgrade) and any notable differences. Flag data gaps."
+      },
+      {
+        "id": "proposal",
+        "title": "Write the tier proposal",
+        "mode": "leaf",
+        "role": "writer",
+        "critique": "critic",
+        "instructions": "Propose pricing tiers for a developer tool with a free plan, based on the comparison. Lead with the recommended tier structure in a short table (tier name, price, pricing metric, limits, key features). Then explain how each choice follows from the five tools' pricing, state the upgrade triggers from free to paid, and note assumptions and risks, including where the proposal would change. Do not invent facts about the product beyond what the goal states; label assumptions as such."
+      }
+    ]
+  }
+}

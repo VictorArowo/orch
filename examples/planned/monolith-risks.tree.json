@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "goal": "List the main risks of splitting a monolith into microservices, and how to mitigate each one.",
+  "root": {
+    "id": "root",
+    "title": "Monolith to microservices risks",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "risks",
+        "title": "Identify and mitigate main risks",
+        "mode": "leaf",
+        "role": "researcher",
+        "check": "fact-checker",
+        "instructions": "Identify the 8 main risks of splitting a monolith into microservices (for example: distributed system complexity, data consistency and splitting the database, wrong service boundaries, network latency and partial failures, testing and debugging difficulty, operational/observability overhead, organisational and skills mismatch, migration cost and stalled migrations, security surface area). For each risk give: a one-sentence description of what goes wrong, and 2-4 concrete mitigations (named patterns or practices such as strangler fig, saga, outbox, contract testing, circuit breakers, distributed tracing, domain-driven design bounded contexts, modular monolith first). Say where you are unsure or where evidence is mostly anecdotal."
+      },
+      {
+        "id": "final",
+        "title": "Write the final answer",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "risks"
+        ],
+        "critique": "critic",
+        "instructions": "Write the final deliverable: lead with a one- or two-sentence overall answer (including when splitting may not be worth it). Then present the risks as a compact table or list with columns/fields: Risk, What goes wrong, Mitigation. Keep it plain and concise, ordered from most to least significant, and end with a short note on the most common mitigation theme (e.g. incremental migration and strong observability)."
+      }
+    ]
+  }
+}

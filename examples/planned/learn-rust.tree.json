@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "goal": "Make a six-week plan for an experienced Python developer to learn Rust well enough to ship a CLI tool.",
+  "root": {
+    "id": "root",
+    "title": "Six-week Rust plan for a Python developer",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "research",
+        "title": "Gather learning resources and tooling",
+        "mode": "parallel",
+        "children": [
+          {
+            "id": "res-learning",
+            "title": "Research learning resources",
+            "mode": "leaf",
+            "role": "researcher",
+            "check": "fact-checker",
+            "instructions": "Identify the best current resources for an experienced Python developer learning Rust: The Rust Book, Rustlings, Rust by Example, Comprehensive Rust, Rust for Python developers guides, and any others worth including. For each give the name, format, what it is best for, and which Rust concepts it covers well. Flag concepts that are hardest for Python developers (ownership, borrowing, lifetimes, traits, error handling, enums/pattern matching) and which resource handles each best. Say where you are unsure."
+          },
+          {
+            "id": "res-cli",
+            "title": "Research the Rust CLI toolchain",
+            "mode": "leaf",
+            "role": "researcher",
+            "check": "fact-checker",
+            "instructions": "Describe the standard Rust toolchain and ecosystem for building and shipping a CLI tool: cargo, rustup, clippy, rustfmt, rust-analyzer; crates such as clap, serde, anyhow, thiserror, regex, and an option for terminal output or progress bars; testing approaches (unit tests, integration tests, assert_cmd); and distribution options (cargo install, GitHub release binaries, cross-compilation, cargo-dist or similar). Give the Python equivalent for each where one exists. Say where you are unsure about current versions or recommendations."
+          }
+        ]
+      },
+      {
+        "id": "plan",
+        "title": "Write the six-week plan",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "res-learning",
+          "res-cli"
+        ],
+        "critique": "critic",
+        "instructions": "Write the six-week plan for an experienced Python developer learning Rust well enough to ship a CLI tool. Lead with a short summary of the approach and the final deliverable. Then give a week-by-week plan (weeks 1-6), each week with a theme, specific topics, named resources from the inputs, a hands-on exercise, and a checkpoint for knowing the week is done. Build up to a small real CLI tool that is built, tested, and released by the end of week 6. Map Python concepts to Rust ones where it helps. Include a rough weekly time estimate stated as an assumption, common pitfalls for Python developers, and what to cut if the learner falls behind. Keep it plain and scannable."
+      }
+    ]
+  }
+}

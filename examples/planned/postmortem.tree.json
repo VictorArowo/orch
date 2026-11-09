@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "goal": "Draft a postmortem template for a database outage, plus a filled-in example of it.",
+  "root": {
+    "id": "root",
+    "title": "Database outage postmortem template and example",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "template",
+        "title": "Draft the postmortem template",
+        "mode": "leaf",
+        "role": "writer",
+        "instructions": "Draft a blameless postmortem template for a database outage. Include these sections with a short prompt or guidance under each: title and metadata (incident ID, date, severity, authors, status), summary, impact (users, duration, data loss, revenue or SLA effect), timeline (table with timestamp, event, actor), detection (how found, time to detect), response and mitigation, root cause and contributing factors (including a 5 whys prompt), what went well, what went poorly, where we got lucky, resolution and recovery, action items (table with owner, priority, due date, type: prevent/detect/mitigate, tracking link), lessons learned, and appendix (graphs, logs, queries). Add database-specific prompts such as replication lag, failover behaviour, backups and restore tested, connection exhaustion, schema or migration changes, capacity and disk, and config changes. Use Markdown with placeholders in square brackets. Output only the template."
+      },
+      {
+        "id": "example",
+        "title": "Write the filled-in example",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "template"
+        ],
+        "check": "editor",
+        "instructions": "Produce the final deliverable: first the blank template exactly as given in the input, then a filled-in example of it for a realistic but clearly fictional incident (for example a primary PostgreSQL failover that fails because of replication lag and an exhausted connection pool after a migration). Label the example as fictional. Fill in every section of the template with specific, plausible details: consistent timestamps and durations, a timeline table, calculated time to detect and time to resolve that match the timeline, impact figures, a root cause with contributing factors and 5 whys, and action items with owners (role names), priorities and due dates. Keep a blameless tone. Make sure the summary, impact, timeline and action items agree with each other."
+      }
+    ]
+  }
+}

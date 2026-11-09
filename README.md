@@ -102,7 +102,7 @@ The planner sends the plan role the goal, the panel's other roles with their job
 
 Estimates are a range per step and for the whole tree. The low end assumes every step works first time with a typical reply size (about 300 tokens for text, 40 for a list or a verdict). The high end assumes every check sends work back as often as it can, every critique forces a revision, ladders climb to the top, and every reply uses its whole token limit. Input sizes come from the expected outputs of the steps a step reads. A fan-out over another step's list assumes the count its wording gives ("the five most popular"), or 3 up to the fan-out limit when it doesn't say.
 
-[examples/goals.json](examples/goals.json) holds eleven varied goals for tuning the planner, each with a note on what a sensible tree looks like. `pnpm plan:goals --mock` plans them all and prints one row per goal with its shape, estimate and drafting cost; without `--mock` it uses the real plan model, within `--cap` (default $0.50).
+[examples/goals.json](examples/goals.json) holds eleven varied goals for tuning the planner, each with a note on what a sensible tree looks like. `pnpm plan:goals --mock` plans them all and prints one row per goal with its shape, estimate and drafting cost; without `--mock` it uses the real plan model, within `--cap` (default $0.50). [examples/planned/](examples/planned) holds the trees the tuned planner drafted for those goals with the starter panel; a test checks they still validate.
 
 ## Panels
 

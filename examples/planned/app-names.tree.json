@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "goal": "Brainstorm names for a budgeting app for university students and shortlist the best three.",
+  "root": {
+    "id": "root",
+    "title": "Name a student budgeting app",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "brainstorm",
+        "title": "Brainstorm name candidates",
+        "mode": "parallel",
+        "children": [
+          {
+            "id": "names_short",
+            "title": "Short, punchy and invented names",
+            "mode": "leaf",
+            "role": "writer",
+            "instructions": "Brainstorm 12 candidate names for a budgeting app for university students. Focus on short, catchy, brandable and invented or blended words (one or two syllables where possible). For each, give the name and a one-line rationale. Avoid names you know belong to existing well-known finance apps."
+          },
+          {
+            "id": "names_meaning",
+            "title": "Meaningful and student-culture names",
+            "mode": "leaf",
+            "role": "writer",
+            "instructions": "Brainstorm 12 candidate names for a budgeting app for university students. Focus on names that evoke student life (campus, term, semester, lectures, ramen, loans, freshers), money-saving, or friendly wordplay and puns. For each, give the name and a one-line rationale. Avoid names you know belong to existing well-known finance apps."
+          }
+        ]
+      },
+      {
+        "id": "screen",
+        "title": "Screen candidates for clashes",
+        "mode": "leaf",
+        "role": "researcher",
+        "inputs": [
+          "brainstorm"
+        ],
+        "check": "fact-checker",
+        "instructions": "From the combined candidate names, select the 8 strongest for memorability, clarity and fit with university students. For each of the 8, state from your knowledge whether it clashes with a known existing app, company or trademark in finance or apps generally, and any obvious negative or confusing meanings in English. Say clearly when you are unsure rather than guessing, and note that a formal trademark and app-store search is still needed. Return a tight table: name, rationale, known clashes, risk level."
+      },
+      {
+        "id": "shortlist",
+        "title": "Shortlist the best three",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "screen"
+        ],
+        "critique": "critic",
+        "instructions": "Lead with the final shortlist of the best three names, ranked, from the screened candidates. For each give a short reason it works for university students, its main risk, and a sample tagline. Then briefly say why the other candidates were dropped and what checks (trademark, domain, app-store, social handles) should happen next."
+      }
+    ]
+  }
+}

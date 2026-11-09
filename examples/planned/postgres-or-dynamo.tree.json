@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "goal": "Should a two-person SaaS start on Postgres or DynamoDB?",
+  "root": {
+    "id": "root",
+    "title": "Postgres vs DynamoDB for a two-person SaaS",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "research",
+        "title": "Research both databases",
+        "mode": "parallel",
+        "items": [
+          "Postgres (managed, e.g. RDS/Aurora/Neon/Supabase)",
+          "DynamoDB"
+        ],
+        "template": {
+          "title": "Research {{item}}",
+          "mode": "leaf",
+          "role": "researcher",
+          "instructions": "Summarise {{item}} for a two-person SaaS startup choosing its first primary datastore. Cover: data modelling fit for typical SaaS (multi-tenancy, relational data, reporting, ad hoc queries), how hard it is to change access patterns or schema later, operational effort and failure modes, cost at early stage and at modest scale (state current pricing model and approximate figures, saying when unsure), scaling limits, local development and testing, hiring and tooling ecosystem, lock-in and migration difficulty. Note where you are unsure."
+        }
+      },
+      {
+        "id": "compare",
+        "title": "Compare head to head",
+        "mode": "leaf",
+        "role": "analyst",
+        "inputs": [
+          "research"
+        ],
+        "check": "fact-checker",
+        "instructions": "Produce a tight comparison table of Postgres vs DynamoDB across the dimensions covered in the research, plus a short list of the specific conditions under which each is the better first choice for a two-person SaaS (e.g. spiky serverless workloads, strong relational/reporting needs, known access patterns, AWS-only stack)."
+      },
+      {
+        "id": "answer",
+        "title": "Write the recommendation",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "compare"
+        ],
+        "critique": "critic",
+        "instructions": "Write a plain recommendation answering: should a two-person SaaS start on Postgres or DynamoDB? Lead with the answer, give the main reasons, name the circumstances in which the answer would change, and note the main risks of the recommended choice and how to mitigate them. Keep it short."
+      }
+    ]
+  }
+}

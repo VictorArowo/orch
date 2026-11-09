@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "goal": "Summarise what the research says about remote work and productivity, including where studies disagree.",
+  "root": {
+    "id": "root",
+    "title": "Summarise remote work and productivity research",
+    "mode": "sequence",
+    "children": [
+      {
+        "id": "evidence",
+        "title": "Gather evidence by research area",
+        "mode": "parallel",
+        "items": [
+          "randomised controlled trials and field experiments (e.g. Bloom et al. call-centre study, hybrid trial with Trip.com)",
+          "pandemic-era studies using large-scale firm, survey or digital-activity data",
+          "studies finding negative effects on productivity, innovation, collaboration or mentoring",
+          "studies on self-employed, hybrid versus fully remote, and moderators such as job type, seniority, and measurement method"
+        ],
+        "template": {
+          "title": "Research: {{item}}",
+          "mode": "leaf",
+          "role": "researcher",
+          "check": "fact-checker",
+          "instructions": "Summarise the key empirical research on remote work and productivity in this area: {{item}}. For each study give authors, year, sample, how productivity was measured, and the main finding with effect sizes where known. Note limitations such as self-reporting, selection, or short duration. Say clearly where you are unsure of a detail rather than guessing."
+        }
+      },
+      {
+        "id": "compare",
+        "title": "Compare findings and disagreements",
+        "mode": "leaf",
+        "role": "analyst",
+        "inputs": [
+          "evidence"
+        ],
+        "instructions": "Combine the research summaries into a tight comparison table (study, design, productivity measure, setting, finding). Then identify where studies disagree and explain the likely reasons: differing measurement (output vs self-report vs hours), fully remote vs hybrid, task type, pandemic conditions, selection effects, short vs long horizon. Note where the evidence is strong, weak or mixed."
+      },
+      {
+        "id": "write",
+        "title": "Write the summary",
+        "mode": "leaf",
+        "role": "writer",
+        "inputs": [
+          "compare"
+        ],
+        "critique": "critic",
+        "instructions": "Write a plain-language summary of what the research says about remote work and productivity. Lead with the overall answer, then cover the main findings by work arrangement (fully remote, hybrid), where and why studies disagree, and the main caveats and open questions. Keep it concise and do not claim more certainty than the evidence supports."
+      }
+    ]
+  }
+}

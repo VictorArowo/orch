@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "goal": "What is the capital of Australia?",
+  "root": {
+    "id": "root",
+    "title": "Answer capital of Australia",
+    "mode": "leaf",
+    "role": "researcher",
+    "instructions": "State the capital of Australia in one or two sentences, leading with the answer. Optionally add one brief note on a commonly confused city if relevant."
+  }
+}
