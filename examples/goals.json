@@ -1,0 +1,68 @@
+[
+  {
+    "id": "vector-dbs",
+    "goal": "Compare the five most popular open-source vector databases for a small startup.",
+    "expect": "A list step, a fan-out over the five, a comparison, and a recommendation with a critique.",
+    "maxSteps": 12
+  },
+  {
+    "id": "capital",
+    "goal": "What is the capital of Australia?",
+    "expect": "A single leaf. Anything more is the planner over-building.",
+    "maxSteps": 1
+  },
+  {
+    "id": "japan-trip",
+    "goal": "Plan a two-week trip to Japan in spring for two people on a mid-range budget.",
+    "expect": "Constraints first, then regions or legs planned in parallel, then one itinerary with a budget.",
+    "maxSteps": 12
+  },
+  {
+    "id": "postgres-or-dynamo",
+    "goal": "Should a two-person SaaS start on Postgres or DynamoDB?",
+    "expect": "Two fixed items researched in parallel (items, not itemsFrom), then a short recommendation.",
+    "maxSteps": 6
+  },
+  {
+    "id": "learn-rust",
+    "goal": "Make a six-week plan for an experienced Python developer to learn Rust well enough to ship a CLI tool.",
+    "expect": "Weeks or phases planned in parallel from a list, then assembled into one schedule.",
+    "maxSteps": 12
+  },
+  {
+    "id": "remote-work",
+    "goal": "Summarise what the research says about remote work and productivity, including where studies disagree.",
+    "expect": "Questions or themes researched in parallel, then a synthesis that calls out disagreements.",
+    "maxSteps": 10
+  },
+  {
+    "id": "event-sourcing-post",
+    "goal": "Write a 1,000-word blog post explaining event sourcing to frontend developers.",
+    "expect": "An outline, sections drafted in parallel, then one editing pass with a check or critique.",
+    "maxSteps": 10
+  },
+  {
+    "id": "dev-tool-pricing",
+    "goal": "Propose pricing tiers for a developer tool with a free plan, based on how five similar tools price.",
+    "expect": "A list of five comparable tools, their pricing researched in parallel, then a proposal.",
+    "maxSteps": 10
+  },
+  {
+    "id": "monolith-risks",
+    "goal": "List the main risks of splitting a monolith into microservices, and how to mitigate each one.",
+    "expect": "A list of risks, a mitigation per risk in parallel, then a prioritised summary.",
+    "maxSteps": 12
+  },
+  {
+    "id": "app-names",
+    "goal": "Brainstorm names for a budgeting app for university students and shortlist the best three.",
+    "expect": "A few brainstorming angles in parallel, then one shortlist step, perhaps with a jury check.",
+    "maxSteps": 8
+  },
+  {
+    "id": "postmortem",
+    "goal": "Draft a postmortem template for a database outage, plus a filled-in example of it.",
+    "expect": "The template first, then the example built on it. Little or no parallelism.",
+    "maxSteps": 5
+  }
+]

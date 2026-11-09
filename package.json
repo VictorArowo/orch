@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:up": "docker compose up -d --wait"
+    "db:up": "docker compose up -d --wait",
+    "plan:goals": "tsx scripts/plan-goals.ts"
   },
   "engines": {
     "node": ">=22"
